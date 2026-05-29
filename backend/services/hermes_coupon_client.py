@@ -15,10 +15,16 @@ from backend.app.local_env import load_local_env
 
 
 LOGGER = logging.getLogger(__name__)
+MOBILE_REGISTRATION_ERROR_CODE = "mini_program_mobile_registration_required"
+MOBILE_REGISTRATION_ERROR_MESSAGE = "\u8bf7\u5148\u53bb\u5c0f\u7a0b\u5e8f\u6ce8\u518c\u624b\u673a\u53f7"
 
 
 class HermesCouponError(Exception):
     """Raised when portal login or coupon issuing fails."""
+
+    def __init__(self, message: str, *, error_code: str | None = None):
+        self.error_code = error_code
+        super().__init__(message)
 
 
 @dataclass(frozen=True)
@@ -351,8 +357,32 @@ class HermesCouponClient:
         data = payload.get("data") if isinstance(payload.get("data"), dict) else {}
         success_num = int(data.get("successNum") or 0)
         fail_num = int(data.get("failNum") or 0)
+        status = int(data.get("status") or payload.get("status") or 0)
         if str(payload.get("code")) == "0" and payload.get("success") is True and success_num == 1 and fail_num == 0:
             return
+
+        if status == 3 and fail_num > 0:
+            LOGGER.warning(
+                "Hermes coupon issue requires mini-program mobile registration trace_id=%s mobile=%s reward_code=%s task_id=%s hermes_id=%s ref_id=%s ref_type=%s code=%s success=%s message=%s status=%s successNum=%s failNum=%s http_status=%s",
+                trace_id,
+                mask_mobile(mobile),
+                issue_config.reward_code,
+                data.get("id"),
+                issue_config.hermes_id,
+                issue_config.ref_id,
+                issue_config.ref_type,
+                payload.get("code"),
+                payload.get("success"),
+                payload.get("message"),
+                status,
+                success_num,
+                fail_num,
+                payload.get("_http_status"),
+            )
+            raise HermesCouponError(
+                MOBILE_REGISTRATION_ERROR_MESSAGE,
+                error_code=MOBILE_REGISTRATION_ERROR_CODE,
+            )
 
         LOGGER.warning(
             "Hermes coupon issue failed trace_id=%s mobile=%s reward_code=%s task_id=%s hermes_id=%s ref_id=%s ref_type=%s code=%s success=%s message=%s successNum=%s failNum=%s http_status=%s",

@@ -299,6 +299,27 @@ class HermesCouponClientTests(unittest.TestCase):
             client.issue_coupon("13040695156")
 
 
+    def test_issue_coupon_marks_status_3_failures_as_mobile_registration_required(self):
+        _, public_key = _build_public_key_pair()
+        transport = FakeHermesTransport(
+            [
+                {"code": "0", "success": True, "data": {"publicKey": public_key, "version": "v1:"}},
+                {"code": "0", "success": True, "ut": "ut_token_1"},
+                {
+                    "code": "0",
+                    "success": True,
+                    "message": "\u6210\u529f",
+                    "data": {"id": 2605290000000056, "status": 3, "successNum": 0, "failNum": 1},
+                },
+            ]
+        )
+        client = HermesCouponClient(config=_build_config(), transport=transport)
+
+        with self.assertRaisesRegex(HermesCouponError, "\u6ce8\u518c\u624b\u673a\u53f7") as context:
+            client.issue_coupon("13222323232", _build_issue_config())
+
+        self.assertEqual(context.exception.error_code, "mini_program_mobile_registration_required")
+
     def test_issue_coupon_logs_manual_import_request_and_failure_context(self):
         _, public_key = _build_public_key_pair()
         transport = FakeHermesTransport(

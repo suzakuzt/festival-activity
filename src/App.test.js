@@ -985,6 +985,115 @@ describe('P1 activity home', () => {
     expect(wrapper.find('[data-testid="p5-mobile-claim-popup"]').exists()).toBe(false)
   })
 
+  it('prompts mini-program mobile registration when coupon issue returns a status 3 failure', async () => {
+    const createSession = vi.fn().mockResolvedValue({ session_token: 'sess_test' })
+    const registrationError = new Error('\u8bf7\u5148\u53bb\u5c0f\u7a0b\u5e8f\u6ce8\u518c\u624b\u673a\u53f7')
+    registrationError.status = 502
+    registrationError.payload = {
+      success: false,
+      error_code: 'mini_program_mobile_registration_required',
+      message: '\u8bf7\u5148\u53bb\u5c0f\u7a0b\u5e8f\u6ce8\u518c\u624b\u673a\u53f7',
+      detail: '\u8bf7\u5148\u53bb\u5c0f\u7a0b\u5e8f\u6ce8\u518c\u624b\u673a\u53f7',
+    }
+    const claimBenefit = vi.fn().mockRejectedValue(registrationError)
+    const wrapper = mountResult({
+      apiClient: {
+        createSession,
+        claimBenefit,
+        trackEvent: vi.fn().mockResolvedValue({}),
+      },
+      initialP4Detail: {
+        benefit: {
+          rewardCode: 'coupon_30',
+          reward: {
+            couponId: 'coupon_30',
+            amountText: '30',
+            couponName: '\u65e0\u95e8\u69db30\u5143\u5238',
+          },
+        },
+      },
+    })
+
+    await wrapper.get('[data-testid="p2-claim-benefit"]').trigger('click')
+    await wrapper.get('[data-testid="p5-mobile-input"]').setValue('13222323232')
+    await wrapper.get('[data-testid="p5-submit-claim"]').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="mini-program-fallback-dialog"]').exists()).toBe(true)
+    expect(wrapper.get('[data-testid="mini-program-fallback-tip"]').text()).toBe(
+      '\u8bf7\u5148\u53bb\u5c0f\u7a0b\u5e8f\u6ce8\u518c\u624b\u673a\u53f7\uff0c\u626b\u7801\u8fdb\u5165\u5c0f\u7a0b\u5e8f',
+    )
+    expect(wrapper.find('[data-testid="p5-mobile-claim-popup"]').exists()).toBe(false)
+  })
+
+  it('keeps mobile-registration issue failures retryable after the user registers in the mini-program', async () => {
+    const createSession = vi.fn().mockResolvedValue({ session_token: 'sess_test' })
+    const registrationError = new Error('\u8bf7\u5148\u53bb\u5c0f\u7a0b\u5e8f\u6ce8\u518c\u624b\u673a\u53f7')
+    registrationError.status = 502
+    registrationError.payload = {
+      success: false,
+      error_code: 'mini_program_mobile_registration_required',
+      message: '\u8bf7\u5148\u53bb\u5c0f\u7a0b\u5e8f\u6ce8\u518c\u624b\u673a\u53f7',
+      detail: '\u8bf7\u5148\u53bb\u5c0f\u7a0b\u5e8f\u6ce8\u518c\u624b\u673a\u53f7',
+    }
+    const claimBenefit = vi
+      .fn()
+      .mockRejectedValueOnce(registrationError)
+      .mockResolvedValueOnce({
+        claimStatus: 'claimed',
+        receiver_mobile_masked: '132****3232',
+        reward: {
+          couponId: 'coupon_30',
+          reward_code: 'coupon_30',
+          couponStatus: 'unused',
+        },
+        action: {
+          type: 'mini_program_coupon_package',
+          target: MINI_PROGRAM_COUPON_PAGE,
+        },
+      })
+    const activity = mountActivityState({
+      apiClient: {
+        createSession,
+        claimBenefit,
+        trackEvent: vi.fn().mockResolvedValue({}),
+      },
+      initialPage: 'p2',
+      initialP4Detail: {
+        benefit: {
+          rewardCode: 'coupon_30',
+          reward: {
+            couponId: 'coupon_30',
+            reward_code: 'coupon_30',
+            amountText: '30',
+            couponName: '\u65e0\u95e8\u69db30\u5143\u5238',
+          },
+        },
+      },
+    })
+
+    await activity.openP2Benefit()
+    activity.p5Mobile.value = '13222323232'
+    await activity.submitP5MobileClaim()
+    await flushPromises()
+
+    expect(activity.showMiniProgramFallback.value).toBe(true)
+    expect(activity.p4ClaimStatus.value).toBe('unclaimed')
+    expect(activity.p5ClaimStatus.value).toBe('input')
+    expect(activity.p5Result.value.claimStatus).toBe('input')
+
+    activity.closeMiniProgramFallback()
+    await activity.openP2Benefit()
+    activity.p5Mobile.value = '13222323232'
+    await activity.submitP5MobileClaim()
+    await flushPromises()
+
+    expect(claimBenefit).toHaveBeenCalledTimes(2)
+    expect(activity.p4ClaimStatus.value).toBe('claimed')
+    expect(activity.p5ClaimStatus.value).toBe('claimed')
+    expect(activity.p5Result.value.claimStatus).toBe('claimed')
+  })
+
   it('marks the matching P6 coupon usable after a 502 issue fallback claim', async () => {
     window.wx = {
       miniProgram: {},
@@ -1189,6 +1298,27 @@ describe('P1 activity home', () => {
     await wrapper.get('[data-testid="p7-qrcode-preview-close"]').trigger('click')
 
     expect(wrapper.find('[data-testid="p7-qrcode-preview"]').exists()).toBe(false)
+  })
+
+  it('renders the rules QR inline while preserving the preview hotspot', async () => {
+    const wrapper = mountRules()
+
+    const frame = wrapper.get('[data-testid="p7-inline-qrcode"]')
+    expect(frame.find('img').attributes('src')).toContain('qrcode_wechat_group.png')
+
+    await wrapper.get('[data-testid="p7-qrcode-hotspot"]').trigger('click')
+
+    expect(wrapper.get('[data-testid="p7-qrcode-preview"]').isVisible()).toBe(true)
+  })
+
+  it('positions the inline rules QR over the latest left-side frame', () => {
+    const css = readSource('src/style.css')
+
+    expect(css).toMatch(/\.p7-wechat-card\s*{[^}]*position:\s*absolute;[^}]*z-index:\s*5;[^}]*inset:\s*0;[^}]*pointer-events:\s*none;/s)
+    expect(css).toMatch(/\.p7-qrcode-frame\s*{[^}]*position:\s*absolute;[^}]*top:\s*80\.62%;[^}]*left:\s*15\.35%;[^}]*width:\s*19\.45%;/s)
+    expect(css).toMatch(/\.p7-qrcode-frame img\s*{[^}]*display:\s*block;[^}]*width:\s*100%;[^}]*height:\s*100%;[^}]*object-fit:\s*contain;/s)
+    expect(css).toMatch(/\.p7-qrcode-hotspot\s*{[^}]*top:\s*80\.08%;[^}]*left:\s*14\.45%;[^}]*width:\s*21\.36%;/s)
+    expect(css).not.toMatch(/\.p7-rules-card,\s*\.p7-wechat-card\s*{[^}]*clip:\s*rect/s)
   })
 
   it('keeps the enlarged QR preview on a clean white surface without clipping styles', () => {

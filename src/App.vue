@@ -1629,7 +1629,7 @@ onBeforeUnmount(() => {
       </section>
 
       <section class="p7-wechat-card" aria-label="扫码添加企微">
-        <div class="p7-qrcode-frame" @click="trackP7QrcodeClick">
+        <div class="p7-qrcode-frame" data-testid="p7-inline-qrcode" @click="trackP7QrcodeClick">
           <img
             v-if="p7QrcodeSrc"
             :src="p7QrcodeSrc"

@@ -25,9 +25,10 @@ LOGGER = logging.getLogger(__name__)
 
 
 class ApiError(Exception):
-    def __init__(self, status_code: int, message: str):
+    def __init__(self, status_code: int, message: str, *, error_code: str | None = None):
         self.status_code = status_code
         self.message = message
+        self.error_code = error_code
         super().__init__(message)
 
 
@@ -1905,6 +1906,8 @@ def _issue_hermes_coupon(mobile: str, issue_config: HermesCouponIssueConfig, *, 
     try:
         return get_hermes_coupon_client().issue_coupon(mobile, issue_config, trace_id=trace_id)
     except HermesCouponError as exc:
+        error_code = getattr(exc, "error_code", None)
+        message = str(exc) if error_code == "mini_program_mobile_registration_required" else "发券失败，请稍后重试"
         LOGGER.exception(
             "Hermes coupon issue exception trace_id=%s reward_code=%s mobile=%s config_id=%s hermes_id=%s ref_id=%s ref_type=%s error=%s",
             trace_id,
@@ -1916,7 +1919,7 @@ def _issue_hermes_coupon(mobile: str, issue_config: HermesCouponIssueConfig, *, 
             issue_config.ref_type,
             exc,
         )
-        raise ApiError(502, "发券失败，请稍后重试") from exc
+        raise ApiError(502, message, error_code=error_code) from exc
 
 
 def _extract_hermes_task_id(issue_result: dict[str, Any]) -> str | None:

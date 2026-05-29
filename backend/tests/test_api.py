@@ -1,7 +1,10 @@
 import unittest
+import gc
 import os
 import tempfile
 import json
+import time
+import warnings
 from pathlib import Path
 from unittest.mock import patch
 
@@ -17,10 +20,16 @@ class FakeHermesCouponClient:
         self.issued_mobiles = []
         self.issued_requests = []
         self.issue_error = None
+        self.issue_responses = []
 
     def issue_coupon(self, mobile, issue_config=None, *, trace_id=""):
         self.issued_mobiles.append(mobile)
         self.issued_requests.append({"mobile": mobile, "issue_config": issue_config, "trace_id": trace_id})
+        if self.issue_responses:
+            response = self.issue_responses.pop(0)
+            if isinstance(response, Exception):
+                raise response
+            return response
         if self.issue_error:
             raise self.issue_error
         return {
@@ -95,6 +104,8 @@ class ActivityApiFlowTests(unittest.TestCase):
 
     def tearDown(self):
         self.client.close()
+        self.hermes_client.issue_error = None
+        self.hermes_client.issue_responses = []
         self._hermes_patch.stop()
         if self._previous_database_engine is None:
             os.environ.pop("GAOKAO_H5_DB_ENGINE", None)
@@ -121,7 +132,17 @@ class ActivityApiFlowTests(unittest.TestCase):
                 os.environ.pop(key, None)
             else:
                 os.environ[key] = value
-        self.temp_dir.cleanup()
+        for attempt in range(3):
+            try:
+                self.temp_dir.cleanup()
+                break
+            except PermissionError:
+                if attempt == 2:
+                    raise
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore", ResourceWarning)
+                    gc.collect()
+                time.sleep(0.1)
 
     def _initialize_database(self):
         import sqlite3
@@ -1017,6 +1038,115 @@ class ActivityApiFlowTests(unittest.TestCase):
         self.assertEqual(failed_record[1], "failed")
         self.assertEqual(failed_record[2], "failed")
         self.assertEqual(failed_record[3], "发券失败，请稍后重试")
+
+    def test_claim_benefit_returns_registration_error_code_when_hermes_requires_mobile_registration(self):
+        self.hermes_client.issue_error = HermesCouponError(
+            "\u8bf7\u5148\u53bb\u5c0f\u7a0b\u5e8f\u6ce8\u518c\u624b\u673a\u53f7",
+            error_code="mini_program_mobile_registration_required",
+        )
+        session = self._create_session()
+        draw = self._draw(session["session_token"])
+
+        response = self.client.post(
+            "/api/benefit/claim",
+            json={
+                "session_token": session["session_token"],
+                "draw_id": draw["draw_id"],
+                "reward_code": draw["result"]["reward_code"],
+                "mobile": "13222323232",
+            },
+        )
+
+        self.assertEqual(response.status_code, 502)
+        self.assertEqual(response.json()["error_code"], "mini_program_mobile_registration_required")
+        self.assertEqual(response.json()["detail"], "\u8bf7\u5148\u53bb\u5c0f\u7a0b\u5e8f\u6ce8\u518c\u624b\u673a\u53f7")
+
+    def test_claim_benefit_allows_retry_after_mobile_registration_failure(self):
+        import sqlite3
+
+        self.hermes_client.issue_responses = [
+            HermesCouponError(
+                "\u8bf7\u5148\u53bb\u5c0f\u7a0b\u5e8f\u6ce8\u518c\u624b\u673a\u53f7",
+                error_code="mini_program_mobile_registration_required",
+            ),
+            {
+                "code": "0",
+                "success": True,
+                "data": {
+                    "id": 2605290000000060,
+                    "successNum": 1,
+                    "failNum": 0,
+                },
+            },
+        ]
+        session = self._create_session()
+        draw = self._draw(session["session_token"])
+        claim_payload = {
+            "session_token": session["session_token"],
+            "draw_id": draw["draw_id"],
+            "reward_code": draw["result"]["reward_code"],
+            "mobile": "13222323232",
+        }
+
+        first_response = self.client.post("/api/benefit/claim", json=claim_payload)
+
+        self.assertEqual(first_response.status_code, 502)
+        self.assertEqual(first_response.json()["error_code"], "mini_program_mobile_registration_required")
+
+        conn = sqlite3.connect(self.database_path)
+        try:
+            first_record = conn.execute(
+                """
+                SELECT claim_no, claim_status, coupon_issue_status, coupon_issue_error
+                FROM reward_claim_record
+                WHERE draw_id = ? AND reward_code = ?
+                """,
+                (draw["draw_id"], draw["result"]["reward_code"]),
+            ).fetchone()
+        finally:
+            conn.close()
+
+        self.assertIsNotNone(first_record)
+        self.assertEqual(first_record[1], "failed")
+        self.assertEqual(first_record[2], "failed")
+        self.assertEqual(first_record[3], "\u8bf7\u5148\u53bb\u5c0f\u7a0b\u5e8f\u6ce8\u518c\u624b\u673a\u53f7")
+
+        second_response = self.client.post("/api/benefit/claim", json=claim_payload)
+
+        self.assertEqual(second_response.status_code, 200, second_response.text)
+        self.assertEqual(second_response.json()["claimStatus"], "claimed")
+        self.assertEqual(second_response.json()["coupon_issue_status"], "issued")
+        self.assertEqual(second_response.json()["external_coupon_id"], "2605290000000060")
+        self.assertEqual(second_response.json()["claim_no"], first_record[0])
+        self.assertEqual(self.hermes_client.issued_mobiles, ["13222323232", "13222323232"])
+
+        conn = sqlite3.connect(self.database_path)
+        try:
+            claim_count = conn.execute(
+                """
+                SELECT COUNT(*)
+                FROM reward_claim_record
+                WHERE draw_id = ? AND reward_code = ?
+                """,
+                (draw["draw_id"], draw["result"]["reward_code"]),
+            ).fetchone()[0]
+            final_record = conn.execute(
+                """
+                SELECT claim_no, claim_status, coupon_issue_status, coupon_issue_error, external_coupon_id
+                FROM reward_claim_record
+                WHERE draw_id = ? AND reward_code = ?
+                """,
+                (draw["draw_id"], draw["result"]["reward_code"]),
+            ).fetchone()
+        finally:
+            conn.close()
+
+        self.assertEqual(claim_count, 1)
+        self.assertEqual(final_record[0], first_record[0])
+        self.assertEqual(final_record[1], "success")
+        self.assertEqual(final_record[2], "issued")
+        self.assertIsNone(final_record[3])
+        self.assertEqual(final_record[4], "2605290000000060")
 
     def test_claim_benefit_does_not_issue_again_when_existing_claim_is_pending(self):
         import sqlite3

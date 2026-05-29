@@ -475,6 +475,9 @@ const P6_REWARD_CLAIM_TEXT = '\u53bb\u9886\u53d6'
 const P6_REWARD_USE_TEXT = '\u53bb\u4f7f\u7528'
 const P6_GIFT_USE_TEXT = '\u53bb\u67e5\u770b'
 const CLAIM_ISSUE_FALLBACK_STATUS = 502
+const MINI_PROGRAM_MOBILE_REGISTRATION_ERROR_CODE = 'mini_program_mobile_registration_required'
+const MINI_PROGRAM_MOBILE_REGISTRATION_FALLBACK_MESSAGE =
+  '\u8bf7\u5148\u53bb\u5c0f\u7a0b\u5e8f\u6ce8\u518c\u624b\u673a\u53f7\uff0c\u626b\u7801\u8fdb\u5165\u5c0f\u7a0b\u5e8f'
 const MOBILE_PATTERN = /^1[3-9]\d{9}$/
 
 const normalizeP6Reward = (reward = {}) => ({
@@ -731,10 +734,22 @@ const getClaimErrorMessage = (error) => {
 
   return rawMessage
 }
+const getClaimIssueErrorCode = (error) =>
+  String(error?.error_code || error?.errorCode || error?.payload?.error_code || error?.payload?.errorCode || '')
+const getClaimIssueFallbackMessage = (error) =>
+  getClaimIssueErrorCode(error) === MINI_PROGRAM_MOBILE_REGISTRATION_ERROR_CODE
+    ? MINI_PROGRAM_MOBILE_REGISTRATION_FALLBACK_MESSAGE
+    : '领取成功，扫码-进入小程序'
+const isMiniProgramMobileRegistrationError = (error) =>
+  getClaimIssueErrorCode(error) === MINI_PROGRAM_MOBILE_REGISTRATION_ERROR_CODE
 const isClaimIssueFallbackError = (error) => {
   const status = Number(error?.status ?? error?.statusCode ?? error?.response?.status)
   if (status !== CLAIM_ISSUE_FALLBACK_STATUS) {
     return false
+  }
+
+  if (getClaimIssueErrorCode(error) === MINI_PROGRAM_MOBILE_REGISTRATION_ERROR_CODE) {
+    return true
   }
 
   const message = String(error?.message || error?.payload?.message || error?.payload?.detail || '')
@@ -1757,13 +1772,40 @@ export function useP1Activity(options = {}) {
         await redirectP5ClaimAfterMobileBind()
       } catch (error) {
         if (isClaimIssueFallbackError(error)) {
-          markP5ClaimSuccess(buildP5ClaimIssueFallbackResult(mobile), mobile)
+          const issueErrorCode = getClaimIssueErrorCode(error)
           trackEvent('exclusive_benefit_claim_issue_fallback', {
             status: CLAIM_ISSUE_FALLBACK_STATUS,
+            error_code: issueErrorCode || undefined,
             draw_id: latestDrawId.value,
             reward_code: getVisibleP5RewardCode(),
           })
-          await redirectP5ClaimAfterMobileBind({ fallbackMessage: '领取成功，扫码-进入小程序' })
+
+          if (isMiniProgramMobileRegistrationError(error)) {
+            const couponTarget =
+              p5Result.value.action?.type === 'mini_program_coupon_package' && p5Result.value.action?.target
+                ? p5Result.value.action.target
+                : MINI_PROGRAM_COUPON_PAGE
+
+            p4ClaimStatus.value = 'unclaimed'
+            p5ClaimStatus.value = 'input'
+            p5MobileError.value = ''
+            p5UseMessage.value = ''
+            clearP4ClaimMessage()
+            openMiniProgramFallback(
+              couponTarget,
+              'mini_program_coupon_package',
+              getClaimIssueFallbackMessage(error),
+            )
+            trackEvent('use_benefit_redirect_fail', {
+              trigger: 'mobile_registration_required',
+              action_type: 'mini_program_coupon_package',
+              target: couponTarget,
+            })
+            return
+          }
+
+          markP5ClaimSuccess(buildP5ClaimIssueFallbackResult(mobile), mobile)
+          await redirectP5ClaimAfterMobileBind({ fallbackMessage: getClaimIssueFallbackMessage(error) })
           return
         }
 

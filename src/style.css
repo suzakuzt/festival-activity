@@ -2799,8 +2799,7 @@ button {
   margin: 0;
 }
 
-.p7-rules-card,
-.p7-wechat-card {
+.p7-rules-card {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -2811,6 +2810,50 @@ button {
   white-space: nowrap;
   border: 0;
   pointer-events: none;
+}
+
+.p7-wechat-card {
+  position: absolute;
+  z-index: 5;
+  inset: 0;
+  margin: 0;
+  padding: 0;
+  pointer-events: none;
+}
+
+.p7-qrcode-frame {
+  position: absolute;
+  top: 80.62%;
+  left: 15.35%;
+  width: 19.45%;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  color: #8b2012;
+  background: #fff;
+  font-size: 10px;
+  line-height: 1.25;
+  text-align: center;
+}
+
+.p7-qrcode-frame img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.p7-wechat-copy {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .p7-rule-list,
@@ -2829,9 +2872,9 @@ button {
 .p7-qrcode-hotspot {
   position: absolute;
   z-index: 6;
-  top: 76.8%;
-  left: 11.5%;
-  width: 25.5%;
+  top: 80.08%;
+  left: 14.45%;
+  width: 21.36%;
   aspect-ratio: 1;
   margin: 0;
   padding: 0;

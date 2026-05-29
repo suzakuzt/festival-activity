@@ -260,9 +260,12 @@ def benefit_claim(request: BenefitClaimRequest):
             _mask_mobile(request.mobile),
         )
         if error.status_code >= 500:
+            content = {"success": False, "message": error.message, "detail": error.message}
+            if getattr(error, "error_code", None):
+                content["error_code"] = error.error_code
             return JSONResponse(
                 status_code=error.status_code,
-                content={"success": False, "message": error.message, "detail": error.message},
+                content=content,
             )
         _handle_api_error(error)
 
