@@ -157,24 +157,32 @@ class ActivityRepositoryTests(unittest.TestCase):
                 "asset_count": 8,
                 "product_count": 4,
                 "reward_count": 7,
-                "draw_result_count": 5,
+                "draw_result_count": 20,
             },
         )
 
     def test_draw_result_config_reads_seeded_exam_sign_library_without_side_copy(self):
         expected_titles = [
             "过儿签",
-            "范围签",
-            "预习签",
-            "磕头签",
-            "粘锅签",
-        ]
-        expected_main_texts = [
-            "考试期间，不要叫我真名，叫我过儿。",
-            "世界上最宽广的是什么？考试范围。",
-            "快要考试了，别人在复习，自己在预习。",
-            "给书磕个头，就当是复习过了吧。",
-            "想在这次考试咸鱼翻身的，没想到粘锅了。",
+            "奶茶签",
+            "早饭签",
+            "公交签",
+            "外卖签",
+            "充电签",
+            "导航签",
+            "电梯签",
+            "洗衣签",
+            "冰箱签",
+            "煮面签",
+            "雨伞签",
+            "超市签",
+            "闹钟签",
+            "行李签",
+            "锅盖签",
+            "筷子签",
+            "地铁签",
+            "被窝签",
+            "金榜签",
         ]
 
         with connection() as conn:
@@ -188,18 +196,23 @@ class ActivityRepositoryTests(unittest.TestCase):
                 ("gaokao_lucky_sign_2026",),
             ).fetchall()
 
-        self.assertEqual([row["result_code"] for row in rows], [f"sign_{index:03d}" for index in range(1, 6)])
+        self.assertEqual([row["result_code"] for row in rows], [f"sign_{index:03d}" for index in range(1, 21)])
         self.assertEqual([row["result_title"] for row in rows], expected_titles)
-        self.assertEqual([row["main_text"] for row in rows], expected_main_texts)
+        self.assertEqual(rows[0]["main_text"], "考试期间，\\n别叫我真名，\\n叫我过儿，\\n最好叫我全过儿。")
+        self.assertEqual(rows[-1]["main_text"], "笔尖一落，\\n少年上桌。\\n今日开卷，\\n明日上岸。")
         self.assertTrue(all(row["good_text"] == "" for row in rows))
         self.assertTrue(all(row["avoid_text"] == "" for row in rows))
-        self.assertIn("此签一出，主打一个“精神改名大法”", rows[0]["explain_content"])
+        self.assertIn("此签属“礼貌玄学派”", rows[0]["explain_content"])
         first_ext = json.loads(rows[0]["ext_json"])
         self.assertEqual(first_ext["sign_type"], "过儿签")
-        self.assertEqual(first_ext["main_text_columns"], ["考试期间，不要叫我真名，叫我过儿。"])
+        self.assertEqual(first_ext["main_text_columns"], ["考试期间，", "别叫我真名，", "叫我过儿，", "最好叫我全过儿。"])
         self.assertEqual(first_ext["fortune_headline"], "过儿签")
-        self.assertEqual(first_ext["fortune_hint"], "考试期间，不要叫我真名，叫我过儿。")
-        self.assertIn("名字先改成过儿", first_ext["explain_text"])
+        self.assertEqual(first_ext["fortune_hint"], "考试期间，\n别叫我真名，\n叫我过儿，\n最好叫我全过儿。")
+        self.assertIn("准考证名字不能乱写", first_ext["explain_text"])
+        last_ext = json.loads(rows[-1]["ext_json"])
+        self.assertEqual(last_ext["sign_type"], "金榜签")
+        self.assertEqual(last_ext["main_text_columns"], ["笔尖一落，", "少年上桌。", "今日开卷，", "明日上岸。"])
+        self.assertIn("愿你该会的都想起", last_ext["explain_text"])
 
 
 class HealthStatusTests(unittest.TestCase):

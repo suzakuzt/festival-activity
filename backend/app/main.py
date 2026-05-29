@@ -263,6 +263,8 @@ def benefit_claim(request: BenefitClaimRequest):
             content = {"success": False, "message": error.message, "detail": error.message}
             if getattr(error, "error_code", None):
                 content["error_code"] = error.error_code
+            if getattr(error, "extra", None):
+                content.update(error.extra)
             return JSONResponse(
                 status_code=error.status_code,
                 content=content,

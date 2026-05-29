@@ -426,6 +426,7 @@ describe('P1 activity home', () => {
       initialP2Result: {
         signType: '过儿签',
         signLevel: 'TOP_SIGN',
+        fortuneHint: '考试期间，不要叫我真名，叫我过儿。',
         mainTextColumns: ['考试期间，不要叫我真名，叫我过儿。'],
         goodFor: 'LEFT_COPY',
         avoid: 'RIGHT_COPY',
@@ -468,6 +469,24 @@ describe('P1 activity home', () => {
     expect(wrapper.get('[data-testid="p2-claim-benefit"]').exists()).toBe(true)
     expect(wrapper.get('[data-testid="share-poster"]').exists()).toBe(true)
     expect(wrapper.get('[data-testid="share-poster"]').text()).toBe('分享得好礼')
+  })
+
+  it('renders configured fortune text columns as separate result lines', () => {
+    const wrapper = mountResult({
+      initialP2Result: {
+        signType: '过儿签',
+        fortuneHeadline: '过儿签',
+        fortuneHint: '',
+        mainTextColumns: ['考试期间，', '别叫我真名，', '叫我过儿，', '最好叫我全过儿。'],
+      },
+    })
+
+    expect(wrapper.findAll('[data-testid="p2-fortune-line"]').map((line) => line.text())).toEqual([
+      '考试期间，',
+      '别叫我真名，',
+      '叫我过儿，',
+      '最好叫我全过儿。',
+    ])
   })
 
   it('keeps the result-page claim button visible after claim and removes the daily check-in entry', () => {
@@ -1092,6 +1111,51 @@ describe('P1 activity home', () => {
     expect(activity.p4ClaimStatus.value).toBe('claimed')
     expect(activity.p5ClaimStatus.value).toBe('claimed')
     expect(activity.p5Result.value.claimStatus).toBe('claimed')
+  })
+
+  it('restores the displayed draw chance when mobile registration is required', async () => {
+    const createSession = vi.fn().mockResolvedValue({ session_token: 'sess_test' })
+    const registrationError = new Error('\u8bf7\u5148\u53bb\u5c0f\u7a0b\u5e8f\u6ce8\u518c\u624b\u673a\u53f7')
+    registrationError.status = 502
+    registrationError.payload = {
+      success: false,
+      error_code: 'mini_program_mobile_registration_required',
+      message: '\u8bf7\u5148\u53bb\u5c0f\u7a0b\u5e8f\u6ce8\u518c\u624b\u673a\u53f7',
+      detail: '\u8bf7\u5148\u53bb\u5c0f\u7a0b\u5e8f\u6ce8\u518c\u624b\u673a\u53f7',
+      daily_state: {
+        remaining_draw_count: 1,
+        used_draw_count: 0,
+      },
+    }
+    const claimBenefit = vi.fn().mockRejectedValueOnce(registrationError)
+    const activity = mountActivityState({
+      apiClient: {
+        createSession,
+        claimBenefit,
+        trackEvent: vi.fn().mockResolvedValue({}),
+      },
+      initialChance: 0,
+      initialPage: 'p2',
+      initialP4Detail: {
+        benefit: {
+          rewardCode: 'coupon_30',
+          reward: {
+            couponId: 'coupon_30',
+            reward_code: 'coupon_30',
+            amountText: '30',
+            couponName: '\u65e0\u95e8\u69db30\u5143\u5238',
+          },
+        },
+      },
+    })
+
+    await activity.openP2Benefit()
+    activity.p5Mobile.value = '13222323232'
+    await activity.submitP5MobileClaim()
+    await flushPromises()
+
+    expect(activity.drawChance.value).toBe(1)
+    expect(activity.p4ClaimStatus.value).toBe('unclaimed')
   })
 
   it('marks the matching P6 coupon usable after a 502 issue fallback claim', async () => {

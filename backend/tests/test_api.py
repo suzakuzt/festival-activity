@@ -268,8 +268,8 @@ class ActivityApiFlowTests(unittest.TestCase):
         self.assertEqual(draw["result"]["signType"], "过儿签")
         self.assertEqual(draw["result"]["signLevel"], "上上签")
         self.assertEqual(draw["result"]["fortuneHeadline"], "过儿签")
-        self.assertEqual(draw["result"]["fortuneHint"], "考试期间，不要叫我真名，叫我过儿。")
-        self.assertEqual(draw["result"]["mainTextColumns"], ["考试期间，不要叫我真名，叫我过儿。"])
+        self.assertEqual(draw["result"]["fortuneHint"], "考试期间，\n别叫我真名，\n叫我过儿，\n最好叫我全过儿。")
+        self.assertEqual(draw["result"]["mainTextColumns"], ["考试期间，", "别叫我真名，", "叫我过儿，", "最好叫我全过儿。"])
         self.assertEqual(draw["result"]["goodFor"], "")
         self.assertEqual(draw["result"]["avoid"], "")
         self.assertEqual(draw["daily_state"]["remaining_draw_count"], 0)
@@ -296,16 +296,16 @@ class ActivityApiFlowTests(unittest.TestCase):
         )
         self.assertEqual(
             [draw["result"]["fortuneHeadline"] for draw in draws],
-            ["过儿签", "范围签", "预习签", "磕头签", "粘锅签"],
+            ["过儿签", "奶茶签", "早饭签", "公交签", "外卖签"],
         )
         self.assertEqual(
             [draw["result"]["fortuneHint"] for draw in draws],
             [
-                "考试期间，不要叫我真名，叫我过儿。",
-                "世界上最宽广的是什么？考试范围。",
-                "快要考试了，别人在复习，自己在预习。",
-                "给书磕个头，就当是复习过了吧。",
-                "想在这次考试咸鱼翻身的，没想到粘锅了。",
+                "考试期间，\n别叫我真名，\n叫我过儿，\n最好叫我全过儿。",
+                "今日多写一题，\n明日多加一份料。\n珍珠会沉底，\n分数会浮上来。",
+                "早餐吃稳，\n心态放平。\n肚子不闹，\n脑子开机。",
+                "人生像公交，\n错过一站别慌。\n下一站，\n也可能到大学。",
+                "考神已接单，\n好运在配送。\n预计送达：\n开考后三分钟。",
             ],
         )
 
@@ -1147,6 +1147,64 @@ class ActivityApiFlowTests(unittest.TestCase):
         self.assertEqual(final_record[2], "issued")
         self.assertIsNone(final_record[3])
         self.assertEqual(final_record[4], "2605290000000060")
+
+    def test_claim_benefit_refunds_draw_chance_once_when_mobile_registration_is_required(self):
+        import sqlite3
+
+        self.hermes_client.issue_error = HermesCouponError(
+            "\u8bf7\u5148\u53bb\u5c0f\u7a0b\u5e8f\u6ce8\u518c\u624b\u673a\u53f7",
+            error_code="mini_program_mobile_registration_required",
+        )
+        session = self._create_session()
+        self._set_draw_chance(session["user"]["user_id"], 1)
+        draw = self._draw(session["session_token"])
+        claim_payload = {
+            "session_token": session["session_token"],
+            "draw_id": draw["draw_id"],
+            "reward_code": draw["result"]["reward_code"],
+            "mobile": "13222323232",
+        }
+
+        first_response = self.client.post("/api/benefit/claim", json=claim_payload)
+        second_response = self.client.post("/api/benefit/claim", json=claim_payload)
+
+        self.assertEqual(draw["daily_state"]["remaining_draw_count"], 0)
+        self.assertEqual(first_response.status_code, 502)
+        self.assertEqual(first_response.json()["error_code"], "mini_program_mobile_registration_required")
+        self.assertEqual(first_response.json()["daily_state"]["remaining_draw_count"], 1)
+        self.assertEqual(first_response.json()["daily_state"]["used_draw_count"], 0)
+        self.assertEqual(second_response.status_code, 502)
+        self.assertEqual(second_response.json()["daily_state"]["remaining_draw_count"], 1)
+        self.assertEqual(second_response.json()["daily_state"]["used_draw_count"], 0)
+
+        conn = sqlite3.connect(self.database_path)
+        try:
+            daily_state = conn.execute(
+                """
+                SELECT used_draw_count, remaining_draw_count
+                FROM user_daily_state
+                WHERE activity_code = 'gaokao_lucky_sign_2026' AND user_id = ?
+                """,
+                (session["user"]["user_id"],),
+            ).fetchone()
+            rollback_logs = conn.execute(
+                """
+                SELECT COUNT(*)
+                FROM draw_chance_log
+                WHERE activity_code = 'gaokao_lucky_sign_2026'
+                  AND user_id = ?
+                  AND change_type = 'rollback'
+                  AND source_type = 'draw_record'
+                  AND source_id = ?
+                """,
+                (session["user"]["user_id"], str(draw["draw_id"])),
+            ).fetchone()[0]
+        finally:
+            conn.close()
+
+        self.assertEqual(daily_state[0], 0)
+        self.assertEqual(daily_state[1], 1)
+        self.assertEqual(rollback_logs, 1)
 
     def test_claim_benefit_does_not_issue_again_when_existing_claim_is_pending(self):
         import sqlite3

@@ -64,11 +64,11 @@ const DEFAULT_P2_RESULT = {
   signType: '过儿签',
   signLevel: '上上签',
   fortuneHeadline: '过儿签',
-  fortuneHint: '考试期间，不要叫我真名，叫我过儿。',
-  mainTextColumns: ['考试期间，不要叫我真名，叫我过儿。'],
+  fortuneHint: '考试期间，\n别叫我真名，\n叫我过儿，\n最好叫我全过儿。',
+  mainTextColumns: ['考试期间，', '别叫我真名，', '叫我过儿，', '最好叫我全过儿。'],
   goodFor: '',
   avoid: '',
-  explainText: '此签一出，主打一个“精神改名大法”。\n名字先改成过儿，至于能不能过，先把气势拿捏住。\n遇事不要慌，先给自己取个吉利名，生活问你准备好了吗，你说：别问，问就是正在加载中。',
+  explainText: '此签属“礼貌玄学派”。名字可以临时改，准考证名字不能乱写。建议考前默念三遍：我会的全对，不会的也别太离谱。',
 }
 const DEFAULT_P4_DETAIL = {
   title: 'AI解签结果',
@@ -1786,6 +1786,7 @@ export function useP1Activity(options = {}) {
                 ? p5Result.value.action.target
                 : MINI_PROGRAM_COUPON_PAGE
 
+            applyDailyState(error?.payload?.daily_state)
             p4ClaimStatus.value = 'unclaimed'
             p5ClaimStatus.value = 'input'
             p5MobileError.value = ''

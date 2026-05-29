@@ -327,12 +327,15 @@ const splitFortuneHighlightSegments = (line, highlight) => {
   })
 }
 const p2FortuneHighlightText = computed(() => String(p2FortuneHeadline.value || '').replace(/签$/, '').trim())
-const p2FortuneHintLines = computed(() =>
-  splitFortuneHintLines(p2FortuneHint.value).map((line, index) => ({
+const p2FortuneHintLines = computed(() => {
+  const configuredLines = p2Result.value.mainTextColumns?.filter((text) => String(text || '').trim()) ?? []
+  const lines = configuredLines.length > 1 ? configuredLines : splitFortuneHintLines(p2FortuneHint.value)
+
+  return lines.map((line, index) => ({
     id: `${index}-${line}`,
     segments: splitFortuneHighlightSegments(line, p2FortuneHighlightText.value),
-  })),
-)
+  }))
+})
 const splitGlyphs = (text = '') => Array.from(text)
 const P2_SIDE_COMFORT_GLYPH_LIMIT = 10
 const P2_SIDE_MAX_GLYPH_LIMIT = 12

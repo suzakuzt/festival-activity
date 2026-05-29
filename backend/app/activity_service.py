@@ -9,7 +9,12 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from .ai_explain import generate_ai_explain
 from .database import connection, fetch_all, fetch_one, is_integrity_error, is_mysql_connection, last_insert_id
-from ..services.hermes_coupon_client import HermesCouponClient, HermesCouponError, HermesCouponIssueConfig
+from ..services.hermes_coupon_client import (
+    HermesCouponClient,
+    HermesCouponError,
+    HermesCouponIssueConfig,
+    MOBILE_REGISTRATION_ERROR_CODE,
+)
 
 
 DEFAULT_ACTIVITY_CODE = "gaokao_lucky_sign_2026"
@@ -25,10 +30,11 @@ LOGGER = logging.getLogger(__name__)
 
 
 class ApiError(Exception):
-    def __init__(self, status_code: int, message: str, *, error_code: str | None = None):
+    def __init__(self, status_code: int, message: str, *, error_code: str | None = None, extra: dict[str, Any] | None = None):
         self.status_code = status_code
         self.message = message
         self.error_code = error_code
+        self.extra = extra or {}
         super().__init__(message)
 
 
@@ -515,6 +521,7 @@ def claim_benefit(payload: dict[str, Any]) -> dict[str, Any]:
         try:
             issue_result = _issue_hermes_coupon(mobile, issue_config, trace_id=trace_id)
         except ApiError as exc:
+            refunded_daily_state = None
             conn.execute(
                 """
                 UPDATE reward_claim_record
@@ -526,6 +533,8 @@ def claim_benefit(payload: dict[str, Any]) -> dict[str, Any]:
                 """,
                 (exc.message[:255], claim_id),
             )
+            if exc.error_code == MOBILE_REGISTRATION_ERROR_CODE:
+                refunded_daily_state = _refund_draw_chance_once_for_mobile_registration_failure(conn, session, draw)
             conn.commit()
             LOGGER.warning(
                 "Benefit claim marked failed trace_id=%s claim_id=%s reward_code=%s mobile=%s error=%s",
@@ -535,6 +544,8 @@ def claim_benefit(payload: dict[str, Any]) -> dict[str, Any]:
                 masked_mobile,
                 exc.message,
             )
+            if refunded_daily_state:
+                exc.extra["daily_state"] = _format_daily_state(refunded_daily_state)
             raise
 
         external_coupon_id = _extract_hermes_task_id(issue_result)
@@ -1657,6 +1668,43 @@ def _insert_chance_log(conn, activity_code: str, user_id: int, change_type: str,
     )
 
 
+def _refund_draw_chance_once_for_mobile_registration_failure(conn, session: dict[str, Any], draw: dict[str, Any]) -> dict[str, Any] | None:
+    activity_code = session["activity_code"]
+    user_id = int(session["user_id"])
+    draw_id = str(draw["id"])
+    existing_refund = fetch_one(
+        conn,
+        """
+        SELECT id
+        FROM draw_chance_log
+        WHERE activity_code = ?
+          AND user_id = ?
+          AND change_type = 'rollback'
+          AND source_type = 'draw_record'
+          AND source_id = ?
+        """,
+        (activity_code, user_id, draw_id),
+    )
+    daily_state = _get_daily_state(conn, activity_code, user_id, str(draw.get("biz_date") or _today()))
+    if existing_refund or not daily_state:
+        return daily_state
+
+    chance_before = int(daily_state["remaining_draw_count"])
+    chance_after = chance_before + 1
+    conn.execute(
+        """
+        UPDATE user_daily_state
+        SET used_draw_count = CASE WHEN used_draw_count > 0 THEN used_draw_count - 1 ELSE 0 END,
+            remaining_draw_count = ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+        """,
+        (chance_after, daily_state["id"]),
+    )
+    _insert_chance_log(conn, activity_code, user_id, "rollback", 1, chance_before, chance_after, "draw_record", draw_id)
+    return _get_daily_state(conn, activity_code, user_id, str(draw.get("biz_date") or _today()))
+
+
 def _get_reward(conn, activity_code: str, reward_code: str | None) -> dict[str, Any] | None:
     if not reward_code:
         return None
@@ -1907,7 +1955,7 @@ def _issue_hermes_coupon(mobile: str, issue_config: HermesCouponIssueConfig, *, 
         return get_hermes_coupon_client().issue_coupon(mobile, issue_config, trace_id=trace_id)
     except HermesCouponError as exc:
         error_code = getattr(exc, "error_code", None)
-        message = str(exc) if error_code == "mini_program_mobile_registration_required" else "发券失败，请稍后重试"
+        message = str(exc) if error_code == MOBILE_REGISTRATION_ERROR_CODE else "发券失败，请稍后重试"
         LOGGER.exception(
             "Hermes coupon issue exception trace_id=%s reward_code=%s mobile=%s config_id=%s hermes_id=%s ref_id=%s ref_type=%s error=%s",
             trace_id,
