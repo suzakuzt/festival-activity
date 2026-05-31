@@ -2,6 +2,7 @@ import json
 import os
 import sqlite3
 import unittest
+from datetime import date
 from pathlib import Path
 from unittest.mock import patch
 
@@ -19,6 +20,7 @@ from backend.app.database import (
 )
 from backend.app.activity_service import (
     _activity_user_upsert_sql,
+    _format_daily_state,
     _grand_prize_draw_config_upsert_sql,
     _grand_prize_qualification_upsert_sql,
 )
@@ -132,6 +134,22 @@ class DatabaseConnectionTests(unittest.TestCase):
         self.assertIn("VALUES(qualification_snapshot_json)", mysql_sql)
         self.assertNotIn("ON CONFLICT", mysql_sql)
         self.assertNotIn("excluded.", mysql_sql)
+
+    def test_format_daily_state_serializes_mysql_date_values(self):
+        payload = _format_daily_state(
+            {
+                "biz_date": date(2026, 5, 31),
+                "base_draw_chance": 1,
+                "extra_draw_chance": 0,
+                "used_draw_count": 0,
+                "remaining_draw_count": 1,
+                "share_reward_count_today": 0,
+                "checked_in_today": 1,
+            }
+        )
+
+        self.assertEqual(payload["biz_date"], "2026-05-31")
+        json.dumps(payload)
 
 
 class ActivityRepositoryTests(unittest.TestCase):

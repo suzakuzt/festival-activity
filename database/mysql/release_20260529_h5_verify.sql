@@ -22,7 +22,7 @@ SELECT
   COUNT(*) AS enabled_sign_count
 FROM draw_result_config
 WHERE activity_code = 'gaokao_lucky_sign_2026'
-  AND result_code LIKE 'sign\_%'
+  AND result_code REGEXP '^sign_[0-9]{3}$'
   AND status = 'enabled';
 
 SELECT
@@ -33,7 +33,7 @@ SELECT
   status
 FROM draw_result_config
 WHERE activity_code = 'gaokao_lucky_sign_2026'
-  AND result_code LIKE 'sign\_%'
+  AND result_code REGEXP '^sign_[0-9]{3}$'
   AND status = 'enabled'
 ORDER BY result_code;
 

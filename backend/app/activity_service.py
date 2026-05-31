@@ -1776,8 +1776,11 @@ def _format_session(row: dict[str, Any]) -> dict[str, Any]:
 def _format_daily_state(row: dict[str, Any] | None) -> dict[str, Any]:
     if not row:
         return {}
+    biz_date = row["biz_date"]
+    if isinstance(biz_date, (date, datetime)):
+        biz_date = biz_date.date().isoformat() if isinstance(biz_date, datetime) else biz_date.isoformat()
     return {
-        "biz_date": row["biz_date"],
+        "biz_date": biz_date,
         "base_draw_chance": row["base_draw_chance"],
         "extra_draw_chance": row["extra_draw_chance"],
         "used_draw_count": row["used_draw_count"],
