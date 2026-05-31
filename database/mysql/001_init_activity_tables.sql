@@ -325,7 +325,7 @@ CREATE TABLE IF NOT EXISTS share_assist_record (
   assister_session_id BIGINT NULL,
   draw_id BIGINT NOT NULL,
   biz_date DATE NOT NULL,
-  assist_status VARCHAR(16) NOT NULL DEFAULT 'completed',
+  assist_status VARCHAR(16) NOT NULL DEFAULT 'pending',
   invalid_reason VARCHAR(255) NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -338,7 +338,7 @@ CREATE TABLE IF NOT EXISTS share_assist_record (
   CONSTRAINT fk_assist_assister FOREIGN KEY (assister_user_id) REFERENCES activity_user(id),
   CONSTRAINT fk_assist_session FOREIGN KEY (assister_session_id) REFERENCES activity_session(id),
   CONSTRAINT fk_assist_draw FOREIGN KEY (draw_id) REFERENCES draw_record(id),
-  CHECK (assist_status IN ('completed', 'invalid'))
+  CHECK (assist_status IN ('pending', 'completed', 'invalid'))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS reward_claim_record (

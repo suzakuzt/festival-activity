@@ -248,7 +248,7 @@ CREATE TABLE IF NOT EXISTS share_assist_record (
   assister_session_id INTEGER,
   draw_id INTEGER NOT NULL,
   biz_date TEXT NOT NULL,
-  assist_status TEXT NOT NULL DEFAULT 'completed' CHECK (assist_status IN ('completed', 'invalid')),
+  assist_status TEXT NOT NULL DEFAULT 'pending' CHECK (assist_status IN ('pending', 'completed', 'invalid')),
   invalid_reason TEXT,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,

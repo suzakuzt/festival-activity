@@ -200,6 +200,23 @@ class ActivityApiFlowTests(unittest.TestCase):
         draw["result"]["rewardCode"] = reward_code
         return draw
 
+    def _draw_and_claim(self, session_token, mobile):
+        draw = self._draw(session_token)
+        claim = self.client.post(
+            "/api/benefit/claim",
+            json={
+                "session_token": session_token,
+                "draw_id": draw["draw_id"],
+                "reward_code": draw["result"]["reward_code"],
+                "mobile": mobile,
+            },
+        )
+        self.assertEqual(claim.status_code, 200, claim.text)
+        return draw, claim.json()
+
+    def _valid_mobile(self, index):
+        return f"138{index:08d}"
+
     def _admin_headers(self):
         return {"X-Admin-Token": "unit-test-admin-token"}
 
@@ -550,9 +567,7 @@ class ActivityApiFlowTests(unittest.TestCase):
         self.assertEqual(
             payload["explainLines"],
             [
-                "此签一出，主打一个“精神改名大法”。",
-                "名字先改成过儿，至于能不能过，先把气势拿捏住。",
-                "遇事不要慌，先给自己取个吉利名，生活问你准备好了吗，你说：别问，问就是正在加载中。",
+                "此签属“礼貌玄学派”。名字可以临时改，准考证名字不能乱写。建议考前默念三遍：我会的全对，不会的也别太离谱。",
             ],
         )
         self.assertEqual(payload["product"]["productName"], "和牛 · 锦绣前程板腱")
@@ -1309,7 +1324,7 @@ class ActivityApiFlowTests(unittest.TestCase):
 
         for index in range(5):
             friend = self._create_session(f"friend_{index}", share["share_token"])
-            self._draw(friend["session_token"])
+            self._draw_and_claim(friend["session_token"], self._valid_mobile(index))
 
         response = self.client.get("/api/grand-prize/qualification/detail", params={"session_token": owner["session_token"]})
         reward_response = self.client.get("/api/reward/center/detail", params={"session_token": owner["session_token"]})
@@ -1329,21 +1344,88 @@ class ActivityApiFlowTests(unittest.TestCase):
         self.assertEqual(reward_response.json()["display_rewards"][-1]["action"]["type"], "mini_program_product_detail")
         self.assertEqual(reward_response.json()["display_rewards"][-1]["action"]["target"], "/pages/product/detail?id=gift_985")
 
-    def test_duplicate_friend_assist_from_new_share_token_does_not_break_draw(self):
+    def test_share_assist_counts_only_after_successful_mobile_claim(self):
+        import sqlite3
+
+        owner = self._create_session("pending_owner")
+        share = self.client.post("/api/share/record", json={"session_token": owner["session_token"], "share_channel": "wechat"}).json()
+        friend = self._create_session("pending_friend", share["share_token"])
+
+        draw = self._draw(friend["session_token"])
+        before = self.client.get("/api/grand-prize/qualification/detail", params={"session_token": owner["session_token"]}).json()
+
+        conn = sqlite3.connect(self.database_path)
+        try:
+            pending_assist = conn.execute(
+                """
+                SELECT assist_status
+                FROM share_assist_record
+                WHERE draw_id = ?
+                """,
+                (draw["draw_id"],),
+            ).fetchone()
+        finally:
+            conn.close()
+
+        self.assertEqual(before["shared_count"], 0)
+        self.assertIsNotNone(pending_assist)
+        self.assertEqual(pending_assist[0], "pending")
+
+        claim_response = self.client.post(
+            "/api/benefit/claim",
+            json={
+                "session_token": friend["session_token"],
+                "draw_id": draw["draw_id"],
+                "reward_code": draw["result"]["reward_code"],
+                "mobile": "13800138000",
+            },
+        )
+        after = self.client.get("/api/grand-prize/qualification/detail", params={"session_token": owner["session_token"]}).json()
+
+        self.assertEqual(claim_response.status_code, 200, claim_response.text)
+        self.assertEqual(after["shared_count"], 1)
+
+    def test_duplicate_friend_assist_from_new_share_token_does_not_break_draw_or_count_twice(self):
         owner = self._create_session("duplicate_owner")
         first_share = self.client.post("/api/share/record", json={"session_token": owner["session_token"], "share_channel": "wechat"}).json()
         friend = self._create_session("duplicate_friend", first_share["share_token"])
         self._set_draw_chance(friend["user"]["user_id"], 2)
 
-        self._draw(friend["session_token"])
+        first_draw, _ = self._draw_and_claim(friend["session_token"], "13800138000")
 
         second_share = self.client.post("/api/share/record", json={"session_token": owner["session_token"], "share_channel": "wechat"}).json()
         duplicate_friend = self._create_session("duplicate_friend", second_share["share_token"])
         duplicate_response = self.client.post("/api/draw/execute", json={"session_token": duplicate_friend["session_token"]})
+        duplicate_claim = self.client.post(
+            "/api/benefit/claim",
+            json={
+                "session_token": duplicate_friend["session_token"],
+                "draw_id": duplicate_response.json()["draw_id"],
+                "reward_code": duplicate_response.json()["result"]["reward_code"],
+                "mobile": "13800138000",
+            },
+        )
         qualification_response = self.client.get("/api/grand-prize/qualification/detail", params={"session_token": owner["session_token"]})
 
+        self.assertTrue(first_draw["success"])
         self.assertEqual(duplicate_response.status_code, 200, duplicate_response.text)
         self.assertTrue(duplicate_response.json()["success"])
+        self.assertEqual(duplicate_claim.status_code, 200, duplicate_claim.text)
+        self.assertEqual(qualification_response.json()["shared_count"], 1)
+
+    def test_same_mobile_can_assist_same_sharer_only_once_across_h5_users(self):
+        owner = self._create_session("same_mobile_owner")
+
+        first_share = self.client.post("/api/share/record", json={"session_token": owner["session_token"], "share_channel": "wechat"}).json()
+        first_friend = self._create_session("same_mobile_friend_a", first_share["share_token"])
+        self._draw_and_claim(first_friend["session_token"], "13800138000")
+
+        second_share = self.client.post("/api/share/record", json={"session_token": owner["session_token"], "share_channel": "wechat"}).json()
+        second_friend = self._create_session("same_mobile_friend_b", second_share["share_token"])
+        _, second_claim = self._draw_and_claim(second_friend["session_token"], "13800138000")
+        qualification_response = self.client.get("/api/grand-prize/qualification/detail", params={"session_token": owner["session_token"]})
+
+        self.assertEqual(second_claim["coupon_issue_status"], "issued")
         self.assertEqual(qualification_response.json()["shared_count"], 1)
 
     def test_grand_prize_lottery_number_is_generated_after_qualification_with_random_suffix(self):
@@ -1358,7 +1440,7 @@ class ActivityApiFlowTests(unittest.TestCase):
         with patch("backend.app.activity_service.secrets.randbelow", side_effect=[0, 0, 0, 0, 0, 554321]):
             for index in range(5):
                 friend = self._create_session(f"random_lottery_friend_{index}", share["share_token"])
-                self._draw(friend["session_token"])
+                self._draw_and_claim(friend["session_token"], self._valid_mobile(index))
 
         after = self.client.get("/api/grand-prize/qualification/detail", params={"session_token": owner["session_token"]}).json()
         suffix = after["lottery_no"][-6:]
@@ -1377,7 +1459,7 @@ class ActivityApiFlowTests(unittest.TestCase):
             share = self.client.post("/api/share/record", json={"session_token": owner["session_token"], "share_channel": "wechat"}).json()
             for index in range(5):
                 friend = self._create_session(f"{prefix}_{index}", share["share_token"])
-                self._draw(friend["session_token"])
+                self._draw_and_claim(friend["session_token"], self._valid_mobile(index))
 
         winner_before = self.client.get("/api/grand-prize/qualification/detail", params={"session_token": winner["session_token"]}).json()
         loser_before = self.client.get("/api/grand-prize/qualification/detail", params={"session_token": loser["session_token"]}).json()
@@ -1434,7 +1516,7 @@ class ActivityApiFlowTests(unittest.TestCase):
             share = self.client.post("/api/share/record", json={"session_token": owner["session_token"], "share_channel": "wechat"}).json()
             for index in range(5):
                 friend = self._create_session(f"{prefix}_{index}", share["share_token"])
-                self._draw(friend["session_token"])
+                self._draw_and_claim(friend["session_token"], self._valid_mobile(index))
 
         winner_before = self.client.get("/api/grand-prize/qualification/detail", params={"session_token": winner["session_token"]}).json()
         loser_before = self.client.get("/api/grand-prize/qualification/detail", params={"session_token": loser["session_token"]}).json()
@@ -1499,7 +1581,7 @@ class ActivityApiFlowTests(unittest.TestCase):
         share = self.client.post("/api/share/record", json={"session_token": owner["session_token"], "share_channel": "wechat"}).json()
         for index in range(5):
             friend = self._create_session(f"configured_pending_friend_{index}", share["share_token"])
-            self._draw(friend["session_token"])
+            self._draw_and_claim(friend["session_token"], self._valid_mobile(index))
 
         before = self.client.get("/api/grand-prize/qualification/detail", params={"session_token": owner["session_token"]}).json()
         lottery_no = before["lottery_no"]
@@ -1531,7 +1613,7 @@ class ActivityApiFlowTests(unittest.TestCase):
         share = self.client.post("/api/share/record", json={"session_token": owner["session_token"], "share_channel": "wechat"}).json()
         for index in range(5):
             friend = self._create_session(f"configured_draw_time_friend_{index}", share["share_token"])
-            self._draw(friend["session_token"])
+            self._draw_and_claim(friend["session_token"], self._valid_mobile(index))
 
         lottery_no = self.client.get(
             "/api/grand-prize/qualification/detail",
@@ -1566,7 +1648,7 @@ class ActivityApiFlowTests(unittest.TestCase):
             share = self.client.post("/api/share/record", json={"session_token": owner["session_token"], "share_channel": "wechat"}).json()
             for index in range(5):
                 friend = self._create_session(f"{prefix}_{index}", share["share_token"])
-                self._draw(friend["session_token"])
+                self._draw_and_claim(friend["session_token"], self._valid_mobile(index))
 
         winner_before = self.client.get("/api/grand-prize/qualification/detail", params={"session_token": winner["session_token"]}).json()
         loser_before = self.client.get("/api/grand-prize/qualification/detail", params={"session_token": loser["session_token"]}).json()
@@ -1614,7 +1696,7 @@ class ActivityApiFlowTests(unittest.TestCase):
 
         for index in range(5):
             friend = self._create_session(f"blank_lottery_friend_{index}", share["share_token"])
-            self._draw(friend["session_token"])
+            self._draw_and_claim(friend["session_token"], self._valid_mobile(index))
 
         import sqlite3
 
@@ -1646,7 +1728,7 @@ class ActivityApiFlowTests(unittest.TestCase):
 
         for index in range(5):
             friend = self._create_session(f"predictable_lottery_friend_{index}", share["share_token"])
-            self._draw(friend["session_token"])
+            self._draw_and_claim(friend["session_token"], self._valid_mobile(index))
 
         legacy_lottery_no = f"GP20260526{owner['user']['user_id']:06d}"
 

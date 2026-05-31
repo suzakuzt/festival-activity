@@ -311,7 +311,7 @@ def execute_draw(payload: dict[str, Any]) -> dict[str, Any]:
 
         checkin = _record_checkin_once(conn, session["activity_code"], int(session["user_id"]), draw_id)
         if session.get("invite_status") == "pending" and session.get("source_share_token"):
-            _complete_share_assist(conn, session, draw_id)
+            _record_pending_share_assist(conn, session, draw_id)
 
         daily_state = _get_daily_state(conn, session["activity_code"], int(session["user_id"]), biz_date)
         progress = _refresh_qualification(conn, config, int(session["user_id"]))
@@ -404,6 +404,8 @@ def claim_benefit(payload: dict[str, Any]) -> dict[str, Any]:
         if existing:
             claim_token = existing.get("claim_token") or _build_claim_token()
             if existing.get("coupon_issue_status") == "issued" and existing.get("claim_status") == "success":
+                _complete_pending_share_assist_after_verified_claim(conn, session, draw, mobile)
+                conn.commit()
                 return _format_claim_result(existing, reward, _get_p5_reward_image_url(conn, session["activity_code"], reward))
 
             if existing.get("coupon_issue_status") == "pending" and existing.get("claim_status") == "pending":
@@ -440,6 +442,8 @@ def claim_benefit(payload: dict[str, Any]) -> dict[str, Any]:
                 conn.rollback()
                 current = fetch_one(conn, "SELECT * FROM reward_claim_record WHERE id = ?", (claim_id,))
                 if current and current.get("coupon_issue_status") == "issued" and current.get("claim_status") == "success":
+                    _complete_pending_share_assist_after_verified_claim(conn, session, draw, mobile)
+                    conn.commit()
                     return _format_claim_result(current, reward, _get_p5_reward_image_url(conn, session["activity_code"], reward))
                 raise ApiError(409, "领取处理中，请稍后查看")
             conn.commit()
@@ -499,6 +503,8 @@ def claim_benefit(payload: dict[str, Any]) -> dict[str, Any]:
                     (session["activity_code"], session["user_id"], draw["id"], reward_code),
                 )
                 if duplicate and duplicate.get("coupon_issue_status") == "issued" and duplicate.get("claim_status") == "success":
+                    _complete_pending_share_assist_after_verified_claim(conn, session, draw, mobile)
+                    conn.commit()
                     return _format_claim_result(duplicate, reward, _get_p5_reward_image_url(conn, session["activity_code"], reward))
                 if duplicate:
                     raise ApiError(409, "领取处理中，请稍后查看")
@@ -570,6 +576,7 @@ def claim_benefit(payload: dict[str, Any]) -> dict[str, Any]:
             """,
             (external_coupon_id, claim_id),
         )
+        _complete_pending_share_assist_after_verified_claim(conn, session, draw, mobile)
         claim = fetch_one(conn, "SELECT * FROM reward_claim_record WHERE id = ?", (claim_id,))
         conn.commit()
         return _format_claim_result(claim, reward, _get_p5_reward_image_url(conn, session["activity_code"], reward))
@@ -1460,7 +1467,7 @@ def _record_checkin_once(conn, activity_code: str, user_id: int, draw_id: int) -
     return {"checked_in_today": True, "lit_day_no": lit_day_no, "lit_days": lit_day_no}
 
 
-def _complete_share_assist(conn, session: dict[str, Any], draw_id: int) -> None:
+def _record_pending_share_assist(conn, session: dict[str, Any], draw_id: int) -> None:
     share = fetch_one(
         conn,
         """
@@ -1471,22 +1478,24 @@ def _complete_share_assist(conn, session: dict[str, Any], draw_id: int) -> None:
         (session["activity_code"], session["source_share_token"]),
     )
     if not share or int(share["user_id"]) == int(session["user_id"]):
-        conn.execute("UPDATE activity_session SET invite_status = 'invalid', updated_at = CURRENT_TIMESTAMP WHERE id = ?", (session["id"],))
+        _mark_share_assist_session_invalid(conn, session["id"])
         return
 
     existing = fetch_one(
         conn,
         """
-        SELECT id
+        SELECT id, assist_status
         FROM share_assist_record
         WHERE activity_code = ?
           AND assister_user_id = ?
           AND (share_token = ? OR sharer_user_id = ?)
+        ORDER BY id ASC
+        LIMIT 1
         """,
         (session["activity_code"], session["user_id"], session["source_share_token"], share["user_id"]),
     )
     if existing:
-        _mark_share_assist_session_completed(conn, session["id"])
+        _sync_session_with_existing_share_assist(conn, session["id"], existing)
         return
 
     try:
@@ -1494,9 +1503,9 @@ def _complete_share_assist(conn, session: dict[str, Any], draw_id: int) -> None:
             """
             INSERT INTO share_assist_record (
               activity_code, share_record_id, share_token, sharer_user_id, assister_user_id,
-              assister_session_id, draw_id, biz_date
+              assister_session_id, draw_id, biz_date, assist_status
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')
             """,
             (
                 session["activity_code"],
@@ -1511,9 +1520,88 @@ def _complete_share_assist(conn, session: dict[str, Any], draw_id: int) -> None:
         )
     except Exception as error:
         if _is_duplicate_share_assist_error(error):
-            _mark_share_assist_session_completed(conn, session["id"])
+            existing = fetch_one(
+                conn,
+                """
+                SELECT id, assist_status
+                FROM share_assist_record
+                WHERE activity_code = ?
+                  AND assister_user_id = ?
+                  AND (share_token = ? OR sharer_user_id = ?)
+                ORDER BY id ASC
+                LIMIT 1
+                """,
+                (session["activity_code"], session["user_id"], session["source_share_token"], share["user_id"]),
+            )
+            if existing:
+                _sync_session_with_existing_share_assist(conn, session["id"], existing)
             return
         raise
+
+
+def _sync_session_with_existing_share_assist(conn, session_id: int, assist: dict[str, Any]) -> None:
+    if assist.get("assist_status") == "completed":
+        _mark_share_assist_session_completed(conn, session_id)
+    elif assist.get("assist_status") == "invalid":
+        _mark_share_assist_session_invalid(conn, session_id)
+
+
+def _complete_pending_share_assist_after_verified_claim(conn, session: dict[str, Any], draw: dict[str, Any], mobile: str) -> None:
+    share_token = draw.get("source_share_token") or session.get("source_share_token")
+    if not share_token:
+        return
+
+    share = fetch_one(
+        conn,
+        """
+        SELECT *
+        FROM share_record
+        WHERE activity_code = ? AND share_token = ?
+        """,
+        (session["activity_code"], share_token),
+    )
+    if not share or int(share["user_id"]) == int(session["user_id"]):
+        _mark_share_assist_session_invalid(conn, session["id"])
+        return
+
+    pending = fetch_one(
+        conn,
+        """
+        SELECT *
+        FROM share_assist_record
+        WHERE activity_code = ?
+          AND sharer_user_id = ?
+          AND assister_user_id = ?
+          AND assist_status = 'pending'
+        ORDER BY created_at ASC, id ASC
+        LIMIT 1
+        """,
+        (session["activity_code"], share["user_id"], session["user_id"]),
+    )
+    if not pending:
+        return
+
+    if _mobile_belongs_to_sharer(conn, session["activity_code"], int(share["user_id"]), mobile):
+        _invalidate_pending_share_assist(conn, pending["id"], session["id"], "self_mobile_for_sharer")
+        return
+
+    if _mobile_has_completed_assist_for_sharer(conn, session["activity_code"], int(share["user_id"]), mobile):
+        _invalidate_pending_share_assist(conn, pending["id"], session["id"], "duplicate_mobile_for_sharer")
+        return
+
+    cursor = conn.execute(
+        """
+        UPDATE share_assist_record
+        SET assist_status = 'completed',
+            invalid_reason = NULL,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+          AND assist_status = 'pending'
+        """,
+        (pending["id"],),
+    )
+    if cursor.rowcount != 1:
+        return
     conn.execute(
         """
         UPDATE share_record
@@ -1522,20 +1610,68 @@ def _complete_share_assist(conn, session: dict[str, Any], draw_id: int) -> None:
             updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
         """,
-        (share["id"],),
+        (pending["share_record_id"],),
     )
-    conn.execute(
-        """
-        UPDATE activity_session
-        SET invite_status = 'completed',
-            assist_completed_at = CURRENT_TIMESTAMP,
-            updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?
-        """,
-        (session["id"],),
-    )
+    _mark_share_assist_session_completed(conn, session["id"])
+    if pending.get("assister_session_id") and int(pending["assister_session_id"]) != int(session["id"]):
+        _mark_share_assist_session_completed(conn, int(pending["assister_session_id"]))
     config = _get_activity_config(conn, session["activity_code"])
     _refresh_qualification(conn, config, int(share["user_id"]))
+
+
+def _invalidate_pending_share_assist(conn, assist_id: int, session_id: int, reason: str) -> None:
+    conn.execute(
+        """
+        UPDATE share_assist_record
+        SET assist_status = 'invalid',
+            invalid_reason = ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+          AND assist_status = 'pending'
+        """,
+        (reason, assist_id),
+    )
+    _mark_share_assist_session_invalid(conn, session_id)
+
+
+def _mobile_has_completed_assist_for_sharer(conn, activity_code: str, sharer_user_id: int, mobile: str) -> bool:
+    existing = fetch_one(
+        conn,
+        """
+        SELECT sar.id
+        FROM share_assist_record sar
+        JOIN reward_claim_record rcr
+          ON rcr.activity_code = sar.activity_code
+         AND rcr.user_id = sar.assister_user_id
+         AND rcr.claim_status = 'success'
+         AND rcr.coupon_issue_status = 'issued'
+         AND rcr.receiver_mobile = ?
+        WHERE sar.activity_code = ?
+          AND sar.sharer_user_id = ?
+          AND sar.assist_status = 'completed'
+        LIMIT 1
+        """,
+        (mobile, activity_code, sharer_user_id),
+    )
+    return existing is not None
+
+
+def _mobile_belongs_to_sharer(conn, activity_code: str, sharer_user_id: int, mobile: str) -> bool:
+    existing = fetch_one(
+        conn,
+        """
+        SELECT id
+        FROM reward_claim_record
+        WHERE activity_code = ?
+          AND user_id = ?
+          AND receiver_mobile = ?
+          AND claim_status = 'success'
+          AND coupon_issue_status = 'issued'
+        LIMIT 1
+        """,
+        (activity_code, sharer_user_id, mobile),
+    )
+    return existing is not None
 
 
 def _mark_share_assist_session_completed(conn, session_id: int) -> None:
@@ -1544,6 +1680,18 @@ def _mark_share_assist_session_completed(conn, session_id: int) -> None:
         UPDATE activity_session
         SET invite_status = 'completed',
             assist_completed_at = CURRENT_TIMESTAMP,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+        """,
+        (session_id,),
+    )
+
+
+def _mark_share_assist_session_invalid(conn, session_id: int) -> None:
+    conn.execute(
+        """
+        UPDATE activity_session
+        SET invite_status = 'invalid',
             updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
         """,
