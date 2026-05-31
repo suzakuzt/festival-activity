@@ -525,7 +525,7 @@ describe('P1 activity home', () => {
     expect(wrapper.text()).not.toContain('压力自动降噪')
   })
 
-  it('opens the activity share poster with QR code but without the product image', async () => {
+  it('opens the activity share poster without the product image or WeCom fallback QR before share link is ready', async () => {
     const wrapper = mountResult({
       initialP2Result: {
         goodFor: 'LEFT_COPY',
@@ -545,9 +545,10 @@ describe('P1 activity home', () => {
     expect(poster.find('[data-testid="p2-share-activity-poster"]').attributes('src')).toContain(
       'share_activity_poster.webp',
     )
-    expect(poster.find('[data-testid="p2-poster-qrcode"]').attributes('src')).toContain('qrcode_wechat_group.png')
+    expect(poster.find('[data-testid="p2-poster-qrcode"]').exists()).toBe(false)
     expect(poster.find('[data-testid="p2-product-image"]').exists()).toBe(false)
     expect(poster.html()).not.toContain('product_flat_iron_steak.webp')
+    expect(poster.html()).not.toContain('qrcode_wechat_group')
     expect(poster.find('[data-testid="save-p2-poster"]').exists()).toBe(false)
     expect(poster.get('[data-testid="p2-poster-longpress-tip"]').text()).toBe('长按海报可保存/分享')
     expect(poster.get('[data-testid="close-p2-panel"]').attributes('aria-label')).toBe('关闭')
@@ -639,6 +640,16 @@ describe('P1 activity home', () => {
   it('renders the home share poster as one generated image before users long-press it', async () => {
     const previewDataUrl = 'data:image/png;base64,home-composed-preview'
     const createSession = vi.fn().mockResolvedValue({ session_token: 'sess_home' })
+    const recordShare = vi.fn().mockResolvedValue({
+      success: true,
+      share_token: 'SH_HOME_PREVIEW',
+      share_url: '/activity/home?share_token=SH_HOME_PREVIEW',
+      reward_granted: false,
+      daily_state: {
+        remaining_draw_count: 1,
+        share_reward_count_today: 0,
+      },
+    })
     const canvasContext = {
       drawImage: vi.fn(),
       fillRect: vi.fn(),
@@ -662,7 +673,7 @@ describe('P1 activity home', () => {
       }
     }
     const wrapper = mountHome({
-      apiClient: { createSession, trackEvent: vi.fn().mockResolvedValue({}) },
+      apiClient: { createSession, recordShare, trackEvent: vi.fn().mockResolvedValue({}) },
     })
 
     await wrapper.get('[data-testid="share-entry"]').trigger('click')
@@ -684,6 +695,16 @@ describe('P1 activity home', () => {
   it('renders the result share poster as one generated image before users long-press it', async () => {
     const previewDataUrl = 'data:image/png;base64,result-composed-preview'
     const createSession = vi.fn().mockResolvedValue({ session_token: 'sess_result' })
+    const recordShare = vi.fn().mockResolvedValue({
+      success: true,
+      share_token: 'SH_RESULT_PREVIEW',
+      share_url: '/activity/home?share_token=SH_RESULT_PREVIEW',
+      reward_granted: false,
+      daily_state: {
+        remaining_draw_count: 1,
+        share_reward_count_today: 0,
+      },
+    })
     const canvasContext = {
       drawImage: vi.fn(),
       fillRect: vi.fn(),
@@ -707,7 +728,7 @@ describe('P1 activity home', () => {
       }
     }
     const wrapper = mountResult({
-      apiClient: { createSession, trackEvent: vi.fn().mockResolvedValue({}) },
+      apiClient: { createSession, recordShare, trackEvent: vi.fn().mockResolvedValue({}) },
     })
 
     await wrapper.get('[data-testid="share-poster"]').trigger('click')
@@ -2050,7 +2071,8 @@ describe('P1 activity home', () => {
     expect(wrapper.get('[data-testid="home-share-activity-poster"]').find('.activity-share-poster-image').attributes('src')).toContain(
       'share_activity_poster.webp',
     )
-    expect(wrapper.get('[data-testid="home-share-qrcode"]').attributes('src')).toContain('qrcode_wechat_group.png')
+    expect(wrapper.find('[data-testid="home-share-qrcode"]').exists()).toBe(false)
+    expect(wrapper.html()).not.toContain('qrcode_wechat_group')
     expect(wrapper.find('[data-testid="save-home-share-poster"]').exists()).toBe(false)
     expect(wrapper.get('[data-testid="home-share-poster-longpress-tip"]').text()).toBe('长按海报可保存/分享')
     expect(wrapper.get('[data-testid="close-share-guide"]').attributes('aria-label')).toBe('关闭')

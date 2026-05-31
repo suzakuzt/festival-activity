@@ -563,7 +563,7 @@ const p7QrcodeSrc = computed(() => {
 })
 const sharePosterQrcodeSrc = ref('')
 const sharePosterUrl = ref('')
-const activityPosterQrcodeSrc = computed(() => sharePosterQrcodeSrc.value || p7QrcodeSrc.value)
+const activityPosterQrcodeSrc = computed(() => sharePosterQrcodeSrc.value)
 const ACTIVITY_SHARE_POSTER_WIDTH = 941
 const ACTIVITY_SHARE_POSTER_HEIGHT = 1672
 const ACTIVITY_SHARE_POSTER_QR = {
@@ -939,10 +939,7 @@ const handleP7QrcodeError = () => {
 const handleActivityPosterQrcodeError = () => {
   if (sharePosterQrcodeSrc.value) {
     sharePosterQrcodeSrc.value = ''
-    return
   }
-
-  handleP7QrcodeError()
 }
 const handleP8QrcodeError = () => {
   p8QrcodeFailed.value = true
