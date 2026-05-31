@@ -1329,6 +1329,23 @@ class ActivityApiFlowTests(unittest.TestCase):
         self.assertEqual(reward_response.json()["display_rewards"][-1]["action"]["type"], "mini_program_product_detail")
         self.assertEqual(reward_response.json()["display_rewards"][-1]["action"]["target"], "/pages/product/detail?id=gift_985")
 
+    def test_duplicate_friend_assist_from_new_share_token_does_not_break_draw(self):
+        owner = self._create_session("duplicate_owner")
+        first_share = self.client.post("/api/share/record", json={"session_token": owner["session_token"], "share_channel": "wechat"}).json()
+        friend = self._create_session("duplicate_friend", first_share["share_token"])
+        self._set_draw_chance(friend["user"]["user_id"], 2)
+
+        self._draw(friend["session_token"])
+
+        second_share = self.client.post("/api/share/record", json={"session_token": owner["session_token"], "share_channel": "wechat"}).json()
+        duplicate_friend = self._create_session("duplicate_friend", second_share["share_token"])
+        duplicate_response = self.client.post("/api/draw/execute", json={"session_token": duplicate_friend["session_token"]})
+        qualification_response = self.client.get("/api/grand-prize/qualification/detail", params={"session_token": owner["session_token"]})
+
+        self.assertEqual(duplicate_response.status_code, 200, duplicate_response.text)
+        self.assertTrue(duplicate_response.json()["success"])
+        self.assertEqual(qualification_response.json()["shared_count"], 1)
+
     def test_grand_prize_lottery_number_is_generated_after_qualification_with_random_suffix(self):
         owner = self._create_session("random_lottery_owner")
         share = self.client.post("/api/share/record", json={"session_token": owner["session_token"], "share_channel": "wechat"}).json()

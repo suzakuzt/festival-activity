@@ -1479,33 +1479,41 @@ def _complete_share_assist(conn, session: dict[str, Any], draw_id: int) -> None:
         """
         SELECT id
         FROM share_assist_record
-        WHERE activity_code = ? AND share_token = ? AND assister_user_id = ?
+        WHERE activity_code = ?
+          AND assister_user_id = ?
+          AND (share_token = ? OR sharer_user_id = ?)
         """,
-        (session["activity_code"], session["source_share_token"], session["user_id"]),
+        (session["activity_code"], session["user_id"], session["source_share_token"], share["user_id"]),
     )
     if existing:
-        conn.execute("UPDATE activity_session SET invite_status = 'completed', assist_completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?", (session["id"],))
+        _mark_share_assist_session_completed(conn, session["id"])
         return
 
-    conn.execute(
-        """
-        INSERT INTO share_assist_record (
-          activity_code, share_record_id, share_token, sharer_user_id, assister_user_id,
-          assister_session_id, draw_id, biz_date
+    try:
+        conn.execute(
+            """
+            INSERT INTO share_assist_record (
+              activity_code, share_record_id, share_token, sharer_user_id, assister_user_id,
+              assister_session_id, draw_id, biz_date
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                session["activity_code"],
+                share["id"],
+                session["source_share_token"],
+                share["user_id"],
+                session["user_id"],
+                session["id"],
+                draw_id,
+                _today(),
+            ),
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            session["activity_code"],
-            share["id"],
-            session["source_share_token"],
-            share["user_id"],
-            session["user_id"],
-            session["id"],
-            draw_id,
-            _today(),
-        ),
-    )
+    except Exception as error:
+        if _is_duplicate_share_assist_error(error):
+            _mark_share_assist_session_completed(conn, session["id"])
+            return
+        raise
     conn.execute(
         """
         UPDATE share_record
@@ -1528,6 +1536,31 @@ def _complete_share_assist(conn, session: dict[str, Any], draw_id: int) -> None:
     )
     config = _get_activity_config(conn, session["activity_code"])
     _refresh_qualification(conn, config, int(share["user_id"]))
+
+
+def _mark_share_assist_session_completed(conn, session_id: int) -> None:
+    conn.execute(
+        """
+        UPDATE activity_session
+        SET invite_status = 'completed',
+            assist_completed_at = CURRENT_TIMESTAMP,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+        """,
+        (session_id,),
+    )
+
+
+def _is_duplicate_share_assist_error(error: Exception) -> bool:
+    if not is_integrity_error(error):
+        return False
+
+    message = str(error)
+    return (
+        "share_assist_record" in message
+        or "uk_share_assist_token_user" in message
+        or "uk_share_assist_sharer_user" in message
+    )
 
 
 def _refresh_qualification(conn, config: dict[str, Any], user_id: int) -> dict[str, Any]:
