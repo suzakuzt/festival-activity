@@ -489,6 +489,14 @@ describe('P1 activity home', () => {
     ])
   })
 
+  it('keeps long result fortune copy clear of the AI scroll header', () => {
+    const css = readSource('src/style.css')
+
+    expect(css).toMatch(/\.p2-fortune-copy p\s*{[^}]*font-size:\s*clamp\(22px,\s*6\.4vw,\s*30px\);/s)
+    expect(css).toMatch(/\.p2-fortune-copy p\s*{[^}]*line-height:\s*1\.26;/s)
+    expect(css).toMatch(/\.p2-ai-panel\s*{[^}]*top:\s*39\.4%;/s)
+  })
+
   it('keeps the result-page claim button visible after claim and removes the daily check-in entry', () => {
     const wrapper = mountResult({
       initialP4Detail: {
@@ -779,13 +787,13 @@ describe('P1 activity home', () => {
     expect(css).toMatch(/\.p2-ai-panel\s*{[^}]*font-family:\s*"STKaiti",\s*"KaiTi",\s*"Kaiti SC",\s*"Songti SC",\s*serif;/s)
     expect(css).toMatch(/\.p2-result-body\s*{[^}]*top:\s*74\.2%;[^}]*height:\s*15\.6%;/s)
     expect(css).toMatch(/\.p2-fortune-copy h2\s*{[^}]*font-size:\s*clamp\(24px,\s*6\.2vw,\s*31px\);/s)
-    expect(css).toMatch(/\.p2-fortune-copy p\s*{[^}]*max-width:\s*76%;[^}]*margin:\s*1\.7%\s*auto\s*0;[^}]*font-size:\s*clamp\(25px,\s*7\.4vw,\s*34px\);[^}]*line-height:\s*1\.34;/s)
+    expect(css).toMatch(/\.p2-fortune-copy p\s*{[^}]*max-width:\s*76%;[^}]*margin:\s*1\.7%\s*auto\s*0;[^}]*font-size:\s*clamp\(22px,\s*6\.4vw,\s*30px\);[^}]*line-height:\s*1\.26;/s)
     expect(css).toMatch(/\.p2-fortune-line\s*{[^}]*display:\s*block;/s)
     expect(css).toMatch(/\.p2-fortune-emphasis\s*{[^}]*color:\s*#b42418;/s)
     expect(css).toMatch(/\.p2-product-hero\s*{[^}]*left:\s*29%;[^}]*width:\s*22%;[^}]*height:\s*58%;/s)
     expect(css).toMatch(/\.p2-product-hero::after\s*{[^}]*radial-gradient\(ellipse/s)
     expect(css).toMatch(/\.p2-product-hero img\s*{[^}]*transform:\s*rotate\(-4deg\)\s*scale\(0\.92\);/s)
-    expect(css).toMatch(/\.p2-ai-panel\s*{[^}]*top:\s*36\.5%;[^}]*width:\s*76%;/s)
+    expect(css).toMatch(/\.p2-ai-panel\s*{[^}]*top:\s*39\.4%;[^}]*width:\s*76%;/s)
     expect(css).toMatch(/\.p2-scroll-head\s*{[^}]*width:\s*72%;[^}]*margin:\s*0 auto;/s)
     expect(css).toMatch(/\.p2-scroll-body\s*{[^}]*url\("\/assets\/p4\/element_ai_result_blank_scroll_panel\.webp"\)/s)
     expect(css).toMatch(/\.p2-scroll-body\s*{[^}]*width:\s*94%;[^}]*margin:\s*-16\.5%\s*auto\s*0;/s)
