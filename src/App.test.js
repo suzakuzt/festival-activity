@@ -1036,7 +1036,7 @@ describe('P1 activity home', () => {
   it('prompts mini-program mobile registration when coupon issue returns a status 3 failure', async () => {
     const createSession = vi.fn().mockResolvedValue({ session_token: 'sess_test' })
     const registrationError = new Error('\u8bf7\u5148\u53bb\u5c0f\u7a0b\u5e8f\u6ce8\u518c\u624b\u673a\u53f7')
-    registrationError.status = 502
+    registrationError.status = 409
     registrationError.payload = {
       success: false,
       error_code: 'mini_program_mobile_registration_required',
@@ -1077,7 +1077,7 @@ describe('P1 activity home', () => {
   it('keeps mobile-registration issue failures retryable after the user registers in the mini-program', async () => {
     const createSession = vi.fn().mockResolvedValue({ session_token: 'sess_test' })
     const registrationError = new Error('\u8bf7\u5148\u53bb\u5c0f\u7a0b\u5e8f\u6ce8\u518c\u624b\u673a\u53f7')
-    registrationError.status = 502
+    registrationError.status = 409
     registrationError.payload = {
       success: false,
       error_code: 'mini_program_mobile_registration_required',
@@ -1145,7 +1145,7 @@ describe('P1 activity home', () => {
   it('restores the displayed draw chance when mobile registration is required', async () => {
     const createSession = vi.fn().mockResolvedValue({ session_token: 'sess_test' })
     const registrationError = new Error('\u8bf7\u5148\u53bb\u5c0f\u7a0b\u5e8f\u6ce8\u518c\u624b\u673a\u53f7')
-    registrationError.status = 502
+    registrationError.status = 409
     registrationError.payload = {
       success: false,
       error_code: 'mini_program_mobile_registration_required',

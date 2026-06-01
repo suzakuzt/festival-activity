@@ -25,6 +25,7 @@ GRAND_PRIZE_LOTTERY_SUFFIX_RANGE = 900000
 GRAND_PRIZE_LOTTERY_MAX_ATTEMPTS = 64
 MOBILE_PATTERN = re.compile(r"^1[3-9]\d{9}$")
 P5_RANDOM_REWARD_CODES = ("coupon_10", "coupon_20", "coupon_30", "discount_9", "discount_75")
+MOBILE_REGISTRATION_REQUIRED_STATUS = 409
 _hermes_coupon_client: HermesCouponClient | None = None
 LOGGER = logging.getLogger(__name__)
 
@@ -2139,7 +2140,22 @@ def _issue_hermes_coupon(mobile: str, issue_config: HermesCouponIssueConfig, *, 
         return get_hermes_coupon_client().issue_coupon(mobile, issue_config, trace_id=trace_id)
     except HermesCouponError as exc:
         error_code = getattr(exc, "error_code", None)
-        message = str(exc) if error_code == MOBILE_REGISTRATION_ERROR_CODE else "发券失败，请稍后重试"
+        if error_code == MOBILE_REGISTRATION_ERROR_CODE:
+            message = str(exc)
+            LOGGER.warning(
+                "Hermes coupon issue requires mini-program registration trace_id=%s reward_code=%s mobile=%s config_id=%s hermes_id=%s ref_id=%s ref_type=%s error=%s",
+                trace_id,
+                issue_config.reward_code,
+                _mask_mobile(mobile),
+                issue_config.config_id,
+                issue_config.hermes_id,
+                issue_config.ref_id,
+                issue_config.ref_type,
+                exc,
+            )
+            raise ApiError(MOBILE_REGISTRATION_REQUIRED_STATUS, message, error_code=error_code) from exc
+
+        message = "发券失败，请稍后重试"
         LOGGER.exception(
             "Hermes coupon issue exception trace_id=%s reward_code=%s mobile=%s config_id=%s hermes_id=%s ref_id=%s ref_type=%s error=%s",
             trace_id,

@@ -475,6 +475,11 @@ const P6_REWARD_CLAIM_TEXT = '\u53bb\u9886\u53d6'
 const P6_REWARD_USE_TEXT = '\u53bb\u4f7f\u7528'
 const P6_GIFT_USE_TEXT = '\u53bb\u67e5\u770b'
 const CLAIM_ISSUE_FALLBACK_STATUS = 502
+const CLAIM_MOBILE_REGISTRATION_REQUIRED_STATUS = 409
+const CLAIM_ISSUE_FALLBACK_STATUSES = new Set([
+  CLAIM_ISSUE_FALLBACK_STATUS,
+  CLAIM_MOBILE_REGISTRATION_REQUIRED_STATUS,
+])
 const MINI_PROGRAM_MOBILE_REGISTRATION_ERROR_CODE = 'mini_program_mobile_registration_required'
 const MINI_PROGRAM_MOBILE_REGISTRATION_FALLBACK_MESSAGE =
   '\u8bf7\u5148\u53bb\u5c0f\u7a0b\u5e8f\u6ce8\u518c\u624b\u673a\u53f7\uff0c\u626b\u7801\u8fdb\u5165\u5c0f\u7a0b\u5e8f'
@@ -736,6 +741,7 @@ const getClaimErrorMessage = (error) => {
 }
 const getClaimIssueErrorCode = (error) =>
   String(error?.error_code || error?.errorCode || error?.payload?.error_code || error?.payload?.errorCode || '')
+const getClaimIssueStatus = (error) => Number(error?.status ?? error?.statusCode ?? error?.response?.status)
 const getClaimIssueFallbackMessage = (error) =>
   getClaimIssueErrorCode(error) === MINI_PROGRAM_MOBILE_REGISTRATION_ERROR_CODE
     ? MINI_PROGRAM_MOBILE_REGISTRATION_FALLBACK_MESSAGE
@@ -743,8 +749,8 @@ const getClaimIssueFallbackMessage = (error) =>
 const isMiniProgramMobileRegistrationError = (error) =>
   getClaimIssueErrorCode(error) === MINI_PROGRAM_MOBILE_REGISTRATION_ERROR_CODE
 const isClaimIssueFallbackError = (error) => {
-  const status = Number(error?.status ?? error?.statusCode ?? error?.response?.status)
-  if (status !== CLAIM_ISSUE_FALLBACK_STATUS) {
+  const status = getClaimIssueStatus(error)
+  if (!CLAIM_ISSUE_FALLBACK_STATUSES.has(status)) {
     return false
   }
 
@@ -1774,7 +1780,7 @@ export function useP1Activity(options = {}) {
         if (isClaimIssueFallbackError(error)) {
           const issueErrorCode = getClaimIssueErrorCode(error)
           trackEvent('exclusive_benefit_claim_issue_fallback', {
-            status: CLAIM_ISSUE_FALLBACK_STATUS,
+            status: getClaimIssueStatus(error) || CLAIM_ISSUE_FALLBACK_STATUS,
             error_code: issueErrorCode || undefined,
             draw_id: latestDrawId.value,
             reward_code: getVisibleP5RewardCode(),

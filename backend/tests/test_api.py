@@ -1072,7 +1072,7 @@ class ActivityApiFlowTests(unittest.TestCase):
             },
         )
 
-        self.assertEqual(response.status_code, 502)
+        self.assertEqual(response.status_code, 409)
         self.assertEqual(response.json()["error_code"], "mini_program_mobile_registration_required")
         self.assertEqual(response.json()["detail"], "\u8bf7\u5148\u53bb\u5c0f\u7a0b\u5e8f\u6ce8\u518c\u624b\u673a\u53f7")
 
@@ -1105,7 +1105,7 @@ class ActivityApiFlowTests(unittest.TestCase):
 
         first_response = self.client.post("/api/benefit/claim", json=claim_payload)
 
-        self.assertEqual(first_response.status_code, 502)
+        self.assertEqual(first_response.status_code, 409)
         self.assertEqual(first_response.json()["error_code"], "mini_program_mobile_registration_required")
 
         conn = sqlite3.connect(self.database_path)
@@ -1184,11 +1184,12 @@ class ActivityApiFlowTests(unittest.TestCase):
         second_response = self.client.post("/api/benefit/claim", json=claim_payload)
 
         self.assertEqual(draw["daily_state"]["remaining_draw_count"], 0)
-        self.assertEqual(first_response.status_code, 502)
+        self.assertEqual(first_response.status_code, 409)
         self.assertEqual(first_response.json()["error_code"], "mini_program_mobile_registration_required")
         self.assertEqual(first_response.json()["daily_state"]["remaining_draw_count"], 1)
         self.assertEqual(first_response.json()["daily_state"]["used_draw_count"], 0)
-        self.assertEqual(second_response.status_code, 502)
+        self.assertEqual(second_response.status_code, 409)
+        self.assertEqual(second_response.json()["error_code"], "mini_program_mobile_registration_required")
         self.assertEqual(second_response.json()["daily_state"]["remaining_draw_count"], 1)
         self.assertEqual(second_response.json()["daily_state"]["used_draw_count"], 0)
 

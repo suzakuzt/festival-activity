@@ -259,7 +259,7 @@ def benefit_claim(request: BenefitClaimRequest):
             request.reward_code,
             _mask_mobile(request.mobile),
         )
-        if error.status_code >= 500:
+        if error.status_code >= 500 or getattr(error, "error_code", None) or getattr(error, "extra", None):
             content = {"success": False, "message": error.message, "detail": error.message}
             if getattr(error, "error_code", None):
                 content["error_code"] = error.error_code
