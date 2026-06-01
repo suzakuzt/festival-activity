@@ -2823,8 +2823,8 @@ button {
 
 .p7-qrcode-frame {
   position: absolute;
-  top: 80.62%;
-  left: 15.35%;
+  top: 85.11%;
+  left: 14.56%;
   width: 19.45%;
   aspect-ratio: 1;
   display: grid;
@@ -2872,8 +2872,8 @@ button {
 .p7-qrcode-hotspot {
   position: absolute;
   z-index: 6;
-  top: 80.08%;
-  left: 14.45%;
+  top: 84.64%;
+  left: 13.88%;
   width: 21.36%;
   aspect-ratio: 1;
   margin: 0;

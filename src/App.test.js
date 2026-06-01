@@ -1408,9 +1408,9 @@ describe('P1 activity home', () => {
     const css = readSource('src/style.css')
 
     expect(css).toMatch(/\.p7-wechat-card\s*{[^}]*position:\s*absolute;[^}]*z-index:\s*5;[^}]*inset:\s*0;[^}]*pointer-events:\s*none;/s)
-    expect(css).toMatch(/\.p7-qrcode-frame\s*{[^}]*position:\s*absolute;[^}]*top:\s*80\.62%;[^}]*left:\s*15\.35%;[^}]*width:\s*19\.45%;/s)
+    expect(css).toMatch(/\.p7-qrcode-frame\s*{[^}]*position:\s*absolute;[^}]*top:\s*85\.11%;[^}]*left:\s*14\.56%;[^}]*width:\s*19\.45%;/s)
     expect(css).toMatch(/\.p7-qrcode-frame img\s*{[^}]*display:\s*block;[^}]*width:\s*100%;[^}]*height:\s*100%;[^}]*object-fit:\s*contain;/s)
-    expect(css).toMatch(/\.p7-qrcode-hotspot\s*{[^}]*top:\s*80\.08%;[^}]*left:\s*14\.45%;[^}]*width:\s*21\.36%;/s)
+    expect(css).toMatch(/\.p7-qrcode-hotspot\s*{[^}]*top:\s*84\.64%;[^}]*left:\s*13\.88%;[^}]*width:\s*21\.36%;/s)
     expect(css).not.toMatch(/\.p7-rules-card,\s*\.p7-wechat-card\s*{[^}]*clip:\s*rect/s)
   })
 
