@@ -81,6 +81,7 @@ describe('P1 activity home', () => {
     window.sessionStorage.clear()
     delete window.wx
     delete window.__wxjs_environment
+    HTMLCanvasElement.prototype.getContext = vi.fn(() => null)
   })
 
   it('loads the WeChat JS-SDK for mini-program web-view navigation', () => {
@@ -997,7 +998,7 @@ describe('P1 activity home', () => {
     toDataUrlSpy.mockRestore()
   })
 
-  it('keeps the result share popup as the dedicated sign poster instead of the generic activity poster', async () => {
+  it('renders the result share sign poster as one generated image before users long-press it', async () => {
     const previewDataUrl = 'data:image/png;base64,result-composed-preview'
     const createSession = vi.fn().mockResolvedValue({ session_token: 'sess_result' })
     const recordShare = vi.fn().mockResolvedValue({
@@ -1011,9 +1012,16 @@ describe('P1 activity home', () => {
       },
     })
     const canvasContext = {
+      beginPath: vi.fn(),
+      closePath: vi.fn(),
       drawImage: vi.fn(),
+      fill: vi.fn(),
       fillRect: vi.fn(),
       fillText: vi.fn(),
+      lineTo: vi.fn(),
+      measureText: vi.fn((text) => ({ width: String(text).length * 18 })),
+      moveTo: vi.fn(),
+      quadraticCurveTo: vi.fn(),
       restore: vi.fn(),
       save: vi.fn(),
       scale: vi.fn(),
@@ -1021,6 +1029,8 @@ describe('P1 activity home', () => {
     const originalImage = globalThis.Image
     const getContextSpy = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(canvasContext)
     const toDataUrlSpy = vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue(previewDataUrl)
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.12)
+    const loadedImageSources = []
     globalThis.Image = class {
       constructor() {
         this.naturalWidth = 941
@@ -1029,6 +1039,7 @@ describe('P1 activity home', () => {
 
       set src(value) {
         this._src = value
+        loadedImageSources.push(value)
         setTimeout(() => this.onload?.(), 0)
       }
     }
@@ -1038,17 +1049,24 @@ describe('P1 activity home', () => {
 
     await wrapper.get('[data-testid="share-poster"]').trigger('click')
     await flushPromises()
+    await new Promise((resolve) => setTimeout(resolve, 40))
+    await flushPromises()
 
-    expect(wrapper.get('[data-testid="result-share-card"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="p2-share-activity-poster"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="p2-poster-generated-preview"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="save-p2-poster"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="result-share-card"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="p2-poster-generated-preview"]').attributes('src')).toBe(previewDataUrl)
     expect(wrapper.get('[data-testid="p2-poster-longpress-tip"]').text()).toBe('长按海报可保存/分享')
-    expect(canvasContext.fillRect).not.toHaveBeenCalled()
-    expect(canvasContext.drawImage).not.toHaveBeenCalled()
+    expect(canvasContext.drawImage).toHaveBeenCalled()
+    expect(loadedImageSources.some((src) => decodeURIComponent(src).includes('bg_result_share_no_ai.webp'))).toBe(true)
+    expect(loadedImageSources.some((src) => decodeURIComponent(src).includes('logo_prime_cuts_home.webp'))).toBe(true)
+    expect(loadedImageSources.some((src) => decodeURIComponent(src).includes('share_mascot_zhuangyuan.webp'))).toBe(true)
+    expect(loadedImageSources.some((src) => decodeURIComponent(src).includes('/activity/home?share_token=SH_RESULT_PREVIEW'))).toBe(
+      true,
+    )
 
     wrapper.unmount()
     globalThis.Image = originalImage
+    randomSpy.mockRestore()
     getContextSpy.mockRestore()
     toDataUrlSpy.mockRestore()
   })

@@ -398,7 +398,12 @@ const updateResultShareMascotSpacing = () => {
 const scheduleResultShareMascotSpacing = async () => {
   await nextTick()
   if (typeof requestAnimationFrame === 'function') {
-    requestAnimationFrame(updateResultShareMascotSpacing)
+    await new Promise((resolve) => {
+      requestAnimationFrame(() => {
+        updateResultShareMascotSpacing()
+        resolve()
+      })
+    })
     return
   }
 
@@ -634,6 +639,8 @@ const sharePosterUrl = ref('')
 const activityPosterQrcodeSrc = computed(() => sharePosterQrcodeSrc.value)
 const ACTIVITY_SHARE_POSTER_WIDTH = 941
 const ACTIVITY_SHARE_POSTER_HEIGHT = 1672
+const RESULT_SHARE_POSTER_WIDTH = 941
+const RESULT_SHARE_POSTER_HEIGHT = 1672
 const ACTIVITY_SHARE_POSTER_QR = {
   left: 0.15,
   top: 0.847,
@@ -787,6 +794,204 @@ const downloadPosterCanvas = (canvas) => {
 
   download(canvas.toDataURL('image/png'))
 }
+const drawContainedPosterImage = (ctx, image, x, y, width, height, options = {}) => {
+  const imageWidth = Number(image?.naturalWidth || image?.width) || width
+  const imageHeight = Number(image?.naturalHeight || image?.height) || height
+  const scale = Math.min(width / imageWidth, height / imageHeight)
+  const drawWidth = imageWidth * scale
+  const drawHeight = imageHeight * scale
+  const alignX = options.alignX ?? 0.5
+  const alignY = options.alignY ?? 0.5
+
+  ctx.drawImage(image, x + (width - drawWidth) * alignX, y + (height - drawHeight) * alignY, drawWidth, drawHeight)
+}
+const createRoundedPosterPath = (ctx, x, y, width, height, radius) => {
+  const normalizedRadius = Math.min(radius, width / 2, height / 2)
+
+  ctx.beginPath()
+  ctx.moveTo(x + normalizedRadius, y)
+  ctx.lineTo(x + width - normalizedRadius, y)
+  ctx.quadraticCurveTo(x + width, y, x + width, y + normalizedRadius)
+  ctx.lineTo(x + width, y + height - normalizedRadius)
+  ctx.quadraticCurveTo(x + width, y + height, x + width - normalizedRadius, y + height)
+  ctx.lineTo(x + normalizedRadius, y + height)
+  ctx.quadraticCurveTo(x, y + height, x, y + height - normalizedRadius)
+  ctx.lineTo(x, y + normalizedRadius)
+  ctx.quadraticCurveTo(x, y, x + normalizedRadius, y)
+  ctx.closePath()
+}
+const drawSegmentedPosterLines = (ctx, lines, x, y, options = {}) => {
+  const {
+    color = '#6b2a18',
+    highlightColor = '#b42418',
+    font = '800 54px KaiTi, STKaiti, serif',
+    lineHeight = 70,
+    maxWidth = 720,
+  } = options
+
+  ctx.save()
+  ctx.font = font
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'top'
+  lines.forEach((line, lineIndex) => {
+    const segments = line.segments?.length ? line.segments : [{ text: String(line || ''), highlight: false }]
+    const segmentWidths = segments.map((segment) => ctx.measureText(segment.text).width)
+    const totalWidth = Math.min(segmentWidths.reduce((sum, width) => sum + width, 0), maxWidth)
+    let cursorX = x - totalWidth / 2
+
+    segments.forEach((segment, segmentIndex) => {
+      ctx.fillStyle = segment.highlight ? highlightColor : color
+      ctx.fillText(segment.text, cursorX, y + lineIndex * lineHeight, maxWidth)
+      cursorX += segmentWidths[segmentIndex]
+    })
+  })
+  ctx.restore()
+}
+const wrapPosterText = (ctx, text, maxWidth) => {
+  const lines = []
+  let line = ''
+
+  Array.from(String(text || '')).forEach((char) => {
+    const nextLine = `${line}${char}`
+    if (line && ctx.measureText(nextLine).width > maxWidth) {
+      lines.push(line)
+      line = char
+      return
+    }
+    line = nextLine
+  })
+
+  if (line) {
+    lines.push(line)
+  }
+  return lines
+}
+const drawWrappedPosterText = (ctx, text, x, y, options = {}) => {
+  const {
+    color = '#6b2a18',
+    font = '700 36px KaiTi, STKaiti, serif',
+    lineHeight = 54,
+    maxWidth = 560,
+    maxLines = 6,
+  } = options
+
+  ctx.save()
+  ctx.fillStyle = color
+  ctx.font = font
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'top'
+  wrapPosterText(ctx, text, maxWidth)
+    .slice(0, maxLines)
+    .forEach((line, index) => {
+      ctx.fillText(line, x, y + index * lineHeight, maxWidth)
+    })
+  ctx.restore()
+}
+const getResultSharePosterScale = () => {
+  const height = resultSharePosterSurfaceRef.value?.getBoundingClientRect?.().height
+  return height ? RESULT_SHARE_POSTER_HEIGHT / height : 1
+}
+const drawResultShareTitle = (ctx, width, height, hasAiExplain) => {
+  ctx.save()
+  ctx.fillStyle = '#542414'
+  ctx.font = `900 ${hasAiExplain ? 50 : 56}px STXingkai, KaiTi, STKaiti, serif`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.shadowColor = 'rgba(76, 17, 4, 0.16)'
+  ctx.shadowBlur = 10
+  ctx.shadowOffsetY = 7
+  ctx.fillText(p2FortuneHeadline.value, width / 2, height * 0.107, width * 0.32)
+  ctx.restore()
+}
+const drawResultShareFortune = (ctx, width, height, hasAiExplain) => {
+  drawSegmentedPosterLines(ctx, p2FortuneHintLines.value, width / 2, height * (hasAiExplain ? 0.162 : 0.164), {
+    font: `800 ${hasAiExplain ? 50 : 58}px KaiTi, STKaiti, serif`,
+    lineHeight: hasAiExplain ? 66 : 78,
+    maxWidth: width * 0.76,
+  })
+}
+const drawResultShareQrcode = async (ctx, width, height) => {
+  const boxSize = width * 0.245
+  const boxX = width * 0.258 - boxSize / 2
+  const boxY = height * 0.838 - boxSize / 2
+  const padding = width * 0.014
+
+  ctx.save()
+  ctx.fillStyle = '#fff'
+  ctx.shadowColor = 'rgba(84, 22, 0, 0.12)'
+  ctx.shadowBlur = 10
+  ctx.shadowOffsetY = 4
+  createRoundedPosterPath(ctx, boxX, boxY, boxSize, boxSize, 12)
+  ctx.fill()
+  ctx.restore()
+
+  if (!activityPosterQrcodeSrc.value) {
+    drawWrappedPosterText(ctx, '二维码暂未配置', boxX + boxSize / 2, boxY + boxSize * 0.42, {
+      color: '#8b2012',
+      font: '700 22px Microsoft YaHei, sans-serif',
+      lineHeight: 28,
+      maxWidth: boxSize - padding * 2,
+      maxLines: 2,
+    })
+    return
+  }
+
+  const qrcode = await loadPosterCanvasImage(activityPosterQrcodeSrc.value)
+  ctx.drawImage(qrcode, boxX + padding, boxY + padding, boxSize - padding * 2, boxSize - padding * 2)
+}
+const drawResultShareNoAiMascot = async (ctx, width, height) => {
+  const mascot = await loadPosterCanvasImage(resultShareMascot.value.src)
+  const boxWidth = width * 0.44
+  const boxHeight = height * 0.2
+  drawContainedPosterImage(ctx, mascot, width * 0.5 - boxWidth / 2, height * (resultShareMascotTopPercent.value / 100), boxWidth, boxHeight, {
+    alignY: 1,
+  })
+}
+const drawResultShareAiPanel = async (ctx, width, height) => {
+  const scale = getResultSharePosterScale()
+  const panelWidth = width * 0.76
+  const panelX = (width - panelWidth) / 2
+  const panelTop = height * (resultShareAiTopPercent.value / 100)
+  const scrollHead = await loadPosterCanvasImage(p4ImageAsset('text_ai_result_scroll_header_double_tassel.png'))
+  const body = await loadPosterCanvasImage(p4ImageAsset('element_ai_result_blank_scroll_panel.webp'))
+  const headWidth = panelWidth * 0.72
+  const headHeight = headWidth * (Number(scrollHead.naturalHeight || scrollHead.height) / Number(scrollHead.naturalWidth || scrollHead.width))
+  const headX = panelX + (panelWidth - headWidth) / 2
+  const bodyWidth = panelWidth * 0.94
+  const bodyHeight = Math.max(resultShareAiBodyHeightPx.value * scale, height * 0.12)
+  const bodyX = panelX + (panelWidth - bodyWidth) / 2
+  const bodyY = panelTop + headHeight - panelWidth * 0.165
+
+  ctx.save()
+  ctx.shadowColor = 'rgba(83, 5, 0, 0.18)'
+  ctx.shadowBlur = 8 * scale
+  ctx.shadowOffsetY = 6 * scale
+  ctx.drawImage(scrollHead, headX, panelTop, headWidth, headHeight)
+  ctx.restore()
+  ctx.drawImage(body, bodyX, bodyY, bodyWidth, bodyHeight)
+
+  const textTop = bodyY + 30 * scale
+  const lines = p4Detail.value.explainLines.slice(0, 4)
+  ctx.save()
+  ctx.fillStyle = '#6b2a18'
+  ctx.font = `700 ${Math.max(30, 14 * scale)}px KaiTi, STKaiti, serif`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'top'
+  lines.flatMap((line) => wrapPosterText(ctx, line, bodyWidth - 48 * scale)).slice(0, 6).forEach((line, index) => {
+    ctx.fillText(line, width / 2, textTop + index * 22 * scale, bodyWidth - 48 * scale)
+  })
+  ctx.restore()
+}
+const drawResultShareAiFooterMascot = async (ctx, width, height) => {
+  const [mascot, goodluck] = await Promise.all([
+    loadPosterCanvasImage(resultShareMascot.value.src),
+    loadPosterCanvasImage(p4ImageAsset('element_good_luck_0842.png')),
+  ])
+  const mascotWidth = width * 0.31
+  const mascotHeight = height * 0.17
+  drawContainedPosterImage(ctx, mascot, width * 0.585 - mascotWidth / 2, height * 0.84 - mascotHeight / 2, mascotWidth, mascotHeight)
+  drawContainedPosterImage(ctx, goodluck, width * 0.728, height * 0.766, width * 0.132, height * 0.15)
+}
 const renderActivityPosterCanvas = async () => {
   if (typeof document === 'undefined') {
     return null
@@ -850,9 +1055,73 @@ const renderActivityPosterCanvas = async () => {
 
   return canvas
 }
-const prepareActivityPosterPreview = async (setPreview, isCurrent) => {
+const renderResultSharePosterCanvas = async () => {
+  await nextTick()
+  if (typeof document === 'undefined') {
+    return null
+  }
+
+  const width = RESULT_SHARE_POSTER_WIDTH
+  const height = RESULT_SHARE_POSTER_HEIGHT
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  const ctx = canvas.getContext('2d')
+
+  if (!ctx) {
+    return null
+  }
+
+  const hasAiExplain = hasResultShareAiExplain.value
   try {
-    const canvas = await renderActivityPosterCanvas()
+    const background = await loadPosterCanvasImage(p4ImageAsset(hasAiExplain ? 'bg_result_share_ai.webp' : 'bg_result_share_no_ai.webp'))
+    ctx.drawImage(background, 0, 0, width, height)
+  } catch {
+    ctx.fillStyle = '#fff0cd'
+    ctx.fillRect(0, 0, width, height)
+  }
+
+  try {
+    const logo = await loadPosterCanvasImage(homeImageAsset('logo_prime_cuts_home.png'))
+    const logoWidth = width * 0.22
+    const logoHeight = logoWidth * (Number(logo.naturalHeight || logo.height) / Number(logo.naturalWidth || logo.width))
+    drawContainedPosterImage(ctx, logo, width * 0.108, height * 0.042, logoWidth, logoHeight)
+  } catch {
+    drawPosterText(ctx, 'Prime Cuts\n璞莱牧', width * 0.218, height * 0.042, {
+      color: '#fff4d2',
+      font: 'bold 30px Microsoft YaHei, sans-serif',
+      lineHeight: 34,
+      maxWidth: width * 0.22,
+    })
+  }
+
+  drawResultShareTitle(ctx, width, height, hasAiExplain)
+  drawResultShareFortune(ctx, width, height, hasAiExplain)
+
+  if (hasAiExplain) {
+    await drawResultShareAiPanel(ctx, width, height)
+    await drawResultShareAiFooterMascot(ctx, width, height)
+  } else {
+    await drawResultShareNoAiMascot(ctx, width, height)
+  }
+
+  try {
+    await drawResultShareQrcode(ctx, width, height)
+  } catch {
+    drawWrappedPosterText(ctx, '扫码参与活动', width * 0.258, height * 0.832, {
+      color: '#8b2012',
+      font: '700 22px Microsoft YaHei, sans-serif',
+      lineHeight: 30,
+      maxWidth: width * 0.18,
+      maxLines: 2,
+    })
+  }
+
+  return canvas
+}
+const preparePosterPreview = async (renderCanvas, setPreview, isCurrent) => {
+  try {
+    const canvas = await renderCanvas()
     if (!canvas || !isCurrent()) {
       return
     }
@@ -866,14 +1135,16 @@ const prepareActivityPosterPreview = async (setPreview, isCurrent) => {
   }
 }
 const prepareHomeSharePosterPreview = () =>
-  prepareActivityPosterPreview(
+  preparePosterPreview(
+    renderActivityPosterCanvas,
     (src) => {
       sharePosterPreviewSrc.value = typeof src === 'function' ? src(sharePosterPreviewSrc.value) : src
     },
     () => showShareGuide.value,
   )
 const prepareP2SharePosterPreview = () =>
-  prepareActivityPosterPreview(
+  preparePosterPreview(
+    renderResultSharePosterCanvas,
     (src) => {
       p2PosterPreviewSrc.value = typeof src === 'function' ? src(p2PosterPreviewSrc.value) : src
     },
@@ -902,9 +1173,11 @@ const openResultSharePoster = () => {
   p2PosterPreviewSrc.value = ''
   pickResultShareMascot()
   openP2Poster()
-  void completeShareForPoster('result_share').then(({ result, hasTrackedQrcode }) => {
+  void completeShareForPoster('result_share').then(async ({ result, hasTrackedQrcode }) => {
     if (hasTrackedQrcode && p2Panel.value === 'poster') {
       p2PosterPreviewSrc.value = ''
+      await scheduleResultShareMascotSpacing()
+      await prepareP2SharePosterPreview()
     }
     void configureResultWechatShare(result)
   })
