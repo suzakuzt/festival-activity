@@ -530,6 +530,11 @@ button {
   place-items: center;
 }
 
+.modal-mask.is-poster-generating {
+  opacity: 0;
+  transition: none;
+}
+
 .mini-program-fallback-dialog {
   position: relative;
   width: min(82vw, 320px);

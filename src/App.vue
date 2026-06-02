@@ -525,6 +525,8 @@ const sharePosterSaveMessage = ref('')
 const sharePosterPreviewSrc = ref('')
 const p2PosterSaveMessage = ref('')
 const p2PosterPreviewSrc = ref('')
+const p2PosterGenerating = ref(false)
+let p2PosterGenerationToken = 0
 const p2PanelTitle = computed(() => (p2Panel.value === 'poster' ? '分享' : '今日解签内容'))
 const p2PanelText = computed(() => {
   if (p2Panel.value === 'poster') {
@@ -1207,16 +1209,18 @@ const preparePosterPreview = async (renderCanvas, setPreview, isCurrent) => {
   try {
     const canvas = await renderCanvas()
     if (!canvas || !isCurrent()) {
-      return
+      return false
     }
 
     const previewSrc = canvas.toDataURL('image/png')
     if (previewSrc && isCurrent()) {
       setPreview((currentSrc) => currentSrc || previewSrc)
+      return true
     }
   } catch {
     // Keep the static poster visible if preview composition fails.
   }
+  return false
 }
 const prepareHomeSharePosterPreview = () =>
   preparePosterPreview(
@@ -1226,14 +1230,27 @@ const prepareHomeSharePosterPreview = () =>
     },
     () => showShareGuide.value,
   )
-const prepareP2SharePosterPreview = () =>
+const prepareP2SharePosterPreview = (generationToken = p2PosterGenerationToken) =>
   preparePosterPreview(
     renderResultSharePosterCanvas,
     (src) => {
       p2PosterPreviewSrc.value = typeof src === 'function' ? src(p2PosterPreviewSrc.value) : src
     },
-    () => p2Panel.value === 'poster',
+    () => p2Panel.value === 'poster' && generationToken === p2PosterGenerationToken,
   )
+const waitForPosterPreview = (preparePreview, timeoutMs = 4500) => {
+  if (typeof window === 'undefined') {
+    return preparePreview()
+  }
+
+  let timeoutId
+  const timeout = new Promise((resolve) => {
+    timeoutId = window.setTimeout(() => resolve(false), timeoutMs)
+  })
+  return Promise.race([preparePreview(), timeout]).finally(() => {
+    window.clearTimeout(timeoutId)
+  })
+}
 const completeShareForPoster = async (shareChannel) => {
   const result = await completeShare(shareChannel)
   return {
@@ -1255,15 +1272,24 @@ const openHomeSharePoster = () => {
 const openResultSharePoster = () => {
   resetSharePosterQrcode()
   p2PosterPreviewSrc.value = ''
+  const generationToken = p2PosterGenerationToken + 1
+  p2PosterGenerationToken = generationToken
+  p2PosterGenerating.value = true
   pickResultShareMascot()
   openP2Poster()
   void completeShareForPoster('result_share').then(async ({ result, hasTrackedQrcode }) => {
-    if (hasTrackedQrcode && p2Panel.value === 'poster') {
-      p2PosterPreviewSrc.value = ''
-      await scheduleResultShareMascotSpacing()
-      await prepareP2SharePosterPreview()
-    }
     void configureResultWechatShare(result)
+    if (p2Panel.value === 'poster' && generationToken === p2PosterGenerationToken) {
+      if (hasTrackedQrcode) {
+        p2PosterPreviewSrc.value = ''
+      }
+      await scheduleResultShareMascotSpacing()
+      await waitForPosterPreview(() => prepareP2SharePosterPreview(generationToken))
+    }
+  }).finally(() => {
+    if (generationToken === p2PosterGenerationToken) {
+      p2PosterGenerating.value = false
+    }
   })
 }
 const saveActivityPoster = async ({ posterType, setMessage, setPreview, shareChannel = 'poster_save' }) => {
@@ -1421,6 +1447,8 @@ watch(showShareGuide, (visible) => {
 
 watch(p2Panel, (panel) => {
   if (panel !== 'poster') {
+    p2PosterGenerationToken += 1
+    p2PosterGenerating.value = false
     p2PosterSaveMessage.value = ''
     p2PosterPreviewSrc.value = ''
     resetSharePosterQrcode()
@@ -1436,6 +1464,8 @@ watch(currentPage, () => {
   showP7QrcodePreview.value = false
   sharePosterSaveMessage.value = ''
   sharePosterPreviewSrc.value = ''
+  p2PosterGenerationToken += 1
+  p2PosterGenerating.value = false
   p2PosterSaveMessage.value = ''
   p2PosterPreviewSrc.value = ''
   resetSharePosterQrcode()
@@ -1451,6 +1481,9 @@ watch(currentPage, () => {
 })
 
 watch(p2Panel, () => {
+  if (p2Panel.value !== 'poster') {
+    p2PosterGenerating.value = false
+  }
   p2PosterSaveMessage.value = ''
   p2PosterPreviewSrc.value = ''
 })
@@ -1803,7 +1836,13 @@ onBeforeUnmount(() => {
       </template>
     </section>
 
-    <div v-if="p2Panel" class="modal-mask" role="presentation">
+    <div
+      v-if="p2Panel"
+      class="modal-mask"
+      :class="{ 'is-poster-generating': p2Panel === 'poster' && p2PosterGenerating && !p2PosterPreviewSrc }"
+      data-testid="p2-panel-mask"
+      role="presentation"
+    >
       <section
         v-if="p2Panel === 'poster'"
         class="p2-poster-dialog"

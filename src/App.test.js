@@ -75,6 +75,15 @@ const flushPromises = async () => {
   await new Promise((resolve) => setTimeout(resolve, 0))
   await new Promise((resolve) => setTimeout(resolve, 0))
 }
+const waitForPosterPreview = async (wrapper, testId = 'p2-poster-generated-preview') => {
+  for (let index = 0; index < 12; index += 1) {
+    if (wrapper.find(`[data-testid="${testId}"]`).exists()) {
+      return
+    }
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    await flushPromises()
+  }
+}
 
 describe('P1 activity home', () => {
   beforeEach(() => {
@@ -1062,8 +1071,7 @@ describe('P1 activity home', () => {
 
     await wrapper.get('[data-testid="share-poster"]').trigger('click')
     await flushPromises()
-    await new Promise((resolve) => setTimeout(resolve, 40))
-    await flushPromises()
+    await waitForPosterPreview(wrapper)
 
     expect(wrapper.find('[data-testid="p2-share-activity-poster"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="result-share-card"]').exists()).toBe(false)
@@ -1080,6 +1088,79 @@ describe('P1 activity home', () => {
     wrapper.unmount()
     globalThis.Image = originalImage
     randomSpy.mockRestore()
+    getContextSpy.mockRestore()
+    toDataUrlSpy.mockRestore()
+  })
+
+  it('hides the result share assembly layer until the generated poster image is ready', async () => {
+    const previewDataUrl = 'data:image/png;base64,result-composed-preview'
+    const createSession = vi.fn().mockResolvedValue({ session_token: 'sess_result_hidden' })
+    let resolveRecordShare
+    const recordShare = vi.fn(
+      () =>
+        new Promise((resolve) => {
+          resolveRecordShare = resolve
+        }),
+    )
+    const canvasContext = {
+      beginPath: vi.fn(),
+      closePath: vi.fn(),
+      drawImage: vi.fn(),
+      fill: vi.fn(),
+      fillRect: vi.fn(),
+      fillText: vi.fn(),
+      lineTo: vi.fn(),
+      measureText: vi.fn((text) => ({ width: String(text).length * 18 })),
+      moveTo: vi.fn(),
+      quadraticCurveTo: vi.fn(),
+      restore: vi.fn(),
+      save: vi.fn(),
+      scale: vi.fn(),
+    }
+    const originalImage = globalThis.Image
+    const getContextSpy = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(canvasContext)
+    const toDataUrlSpy = vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue(previewDataUrl)
+    globalThis.Image = class {
+      constructor() {
+        this.naturalWidth = 941
+        this.naturalHeight = 1672
+      }
+
+      set src(value) {
+        this._src = value
+        setTimeout(() => this.onload?.(), 0)
+      }
+    }
+    const wrapper = mountResult({
+      apiClient: { createSession, recordShare, trackEvent: vi.fn().mockResolvedValue({}) },
+    })
+
+    await wrapper.get('[data-testid="share-poster"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="p2-panel-mask"]').classes()).toContain('is-poster-generating')
+    expect(wrapper.find('[data-testid="p2-poster-generated-preview"]').exists()).toBe(false)
+
+    resolveRecordShare({
+      success: true,
+      share_token: 'SH_RESULT_HIDDEN',
+      share_url: '/activity/home?share_token=SH_RESULT_HIDDEN',
+      reward_granted: false,
+      daily_state: {
+        remaining_draw_count: 1,
+        share_reward_count_today: 0,
+      },
+    })
+    await flushPromises()
+    await new Promise((resolve) => setTimeout(resolve, 40))
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="p2-panel-mask"]').classes()).not.toContain('is-poster-generating')
+    expect(wrapper.find('[data-testid="result-share-card"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="p2-poster-generated-preview"]').attributes('src')).toBe(previewDataUrl)
+
+    wrapper.unmount()
+    globalThis.Image = originalImage
     getContextSpy.mockRestore()
     toDataUrlSpy.mockRestore()
   })
