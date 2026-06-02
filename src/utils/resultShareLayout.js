@@ -28,6 +28,7 @@ export const calculateResultShareAiLayout = ({
   minimumSignGapPx = 18,
   minimumFooterGapPx = 18,
   panelChromePx = 8,
+  bodyTopOffsetPx = 0,
   minTopPercent = 44,
   maxTopPercent = 50,
   minBodyHeightPx = 136,
@@ -51,7 +52,7 @@ export const calculateResultShareAiLayout = ({
 
   const panelTop = surfaceTop + (surfaceHeight * topPercent) / 100
   const availableHeight = Number.isFinite(footerTop)
-    ? footerTop - panelTop - minimumFooterGapPx - panelChromePx
+    ? footerTop - panelTop - bodyTopOffsetPx - minimumFooterGapPx - panelChromePx
     : maxBodyHeightPx
 
   return {

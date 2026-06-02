@@ -158,6 +158,7 @@ const shareAsset = (name) => `${import.meta.env.BASE_URL}assets/share/${name}`
 const miniProgramFallbackQrcodeSrc = computed(
   () => import.meta.env.VITE_MINI_PROGRAM_QRCODE_URL || shareAsset('mini_program_qrcode.jpg'),
 )
+const clampNumber = (value, min, max) => Math.min(max, Math.max(min, value))
 const webpName = (name) => String(name || '').replace(/\.(png|jpe?g)$/i, '.webp')
 const optimizeLocalAssetUrl = (value) => {
   if (!value || /^https?:\/\//i.test(value) || /qrcode/i.test(value)) {
@@ -174,9 +175,17 @@ const p6ImageAsset = (name) => localImageAsset(p6Asset, name)
 const p7ImageAsset = (name) => localImageAsset(p7Asset, name)
 const p8ImageAsset = (name) => localImageAsset(p8Asset, name)
 const activitySharePosterSrc = ref('')
+const p2StageRef = ref(null)
+const p2SignContentRef = ref(null)
+const p2AiScrollBodyRef = ref(null)
+const p2ResultBodyRef = ref(null)
 const resultSharePosterSurfaceRef = ref(null)
 const resultShareSignContentRef = ref(null)
 const resultShareFooterQrcodeRef = ref(null)
+const resultShareAiBodyRef = ref(null)
+const p2AiTopPercent = ref(39.4)
+const p2AiBodyHeightPx = ref(252)
+const p2PosterButtonTopPercent = ref(66.6)
 const resultShareMascotTopPercent = ref(47)
 const resultShareAiTopPercent = ref(47)
 const resultShareAiBodyHeightPx = ref(168)
@@ -267,6 +276,12 @@ const stageStyle = computed(() => ({
 }))
 const p2StageStyle = computed(() => ({
   backgroundImage: `url(${p4ImageAsset('bg_ai_result_page.png')})`,
+}))
+const p2StageLayoutStyle = computed(() => ({
+  ...p2StageStyle.value,
+  '--p2-ai-top': `${p2AiTopPercent.value}%`,
+  '--p2-ai-body-height': `${p2AiBodyHeightPx.value}px`,
+  '--p2-poster-button-top': `${p2PosterButtonTopPercent.value}%`,
 }))
 const p4StageStyle = computed(() => ({
   backgroundImage: `url(${p4ImageAsset('bg_ai_result_page.png')})`,
@@ -373,11 +388,17 @@ const updateResultShareMascotSpacing = () => {
   const signContentRect = signContent.getBoundingClientRect()
   if (hasResultShareAiExplain.value) {
     const footerRect = resultShareFooterQrcodeRef.value?.getBoundingClientRect()
+    const aiBodyRect = resultShareAiBodyRef.value?.getBoundingClientRect()
+    const bodyTopOffsetPx = Number.isFinite(aiBodyRect?.top)
+      ? Math.max(0, aiBodyRect.top - (surfaceRect.top + (surfaceRect.height * resultShareAiTopPercent.value) / 100))
+      : 44
     const layout = calculateResultShareAiLayout({
       surfaceTop: surfaceRect.top,
       surfaceHeight: surfaceRect.height,
       signContentBottom: signContentRect.bottom,
       footerTop: footerRect?.top,
+      minimumFooterGapPx: 28,
+      bodyTopOffsetPx,
     })
     resultShareMascotTopPercent.value = 47
     resultShareAiTopPercent.value = Number(layout.topPercent.toFixed(2))
@@ -407,6 +428,67 @@ const scheduleResultShareMascotSpacing = async () => {
     return
   }
 
+  updateResultShareMascotSpacing()
+}
+const resetP2ResultAiLayout = () => {
+  p2AiTopPercent.value = 39.4
+  p2AiBodyHeightPx.value = 252
+  p2PosterButtonTopPercent.value = 66.6
+}
+const updateP2ResultAiLayout = () => {
+  if (!p4ExplainVisible.value) {
+    resetP2ResultAiLayout()
+    return
+  }
+
+  const stage = p2StageRef.value
+  const signContent = p2SignContentRef.value
+  const aiBody = p2AiScrollBodyRef.value
+  const resultBody = p2ResultBodyRef.value
+  if (!stage || !signContent || !aiBody || !resultBody) {
+    p2AiBodyHeightPx.value = 206
+    p2PosterButtonTopPercent.value = 69
+    return
+  }
+
+  const stageRect = stage.getBoundingClientRect()
+  const signContentRect = signContent.getBoundingClientRect()
+  const aiBodyRect = aiBody.getBoundingClientRect()
+  const resultBodyRect = resultBody.getBoundingClientRect()
+  if (!stageRect.height) {
+    resetP2ResultAiLayout()
+    return
+  }
+
+  const topPercent = calculateResultShareMascotTopPercent({
+    surfaceTop: stageRect.top,
+    surfaceHeight: stageRect.height,
+    signContentBottom: signContentRect.bottom,
+    minimumGapPx: 20,
+    minTopPercent: 39.4,
+    maxTopPercent: 42.4,
+  })
+  const footerTopPx = resultBodyRect.top - stageRect.top
+  const shareTopPx = clampNumber(footerTopPx - 48, stageRect.height * 0.668, stageRect.height * 0.708)
+  const adjustedBodyTopPx =
+    aiBodyRect.top - stageRect.top + ((topPercent - p2AiTopPercent.value) * stageRect.height) / 100
+  const bodyHeightPx = clampNumber(shareTopPx - adjustedBodyTopPx - 24, 160, 212)
+
+  p2AiTopPercent.value = Number(topPercent.toFixed(2))
+  p2AiBodyHeightPx.value = Math.round(bodyHeightPx)
+  p2PosterButtonTopPercent.value = Number(((shareTopPx / stageRect.height) * 100).toFixed(2))
+}
+const scheduleP2ResultAiLayout = async () => {
+  await nextTick()
+  if (typeof requestAnimationFrame === 'function') {
+    requestAnimationFrame(updateP2ResultAiLayout)
+    return
+  }
+
+  updateP2ResultAiLayout()
+}
+const updateResponsiveResultLayouts = () => {
+  updateP2ResultAiLayout()
   updateResultShareMascotSpacing()
 }
 const splitGlyphs = (text = '') => Array.from(text)
@@ -1377,6 +1459,10 @@ watch([p2FortuneHintLines, hasResultShareAiExplain], () => {
   }
 })
 
+watch([p2FortuneHintLines, p4ExplainVisible, p4Detail], () => {
+  void scheduleP2ResultAiLayout()
+})
+
 watch(p4Detail, () => {
   p4ProductImageFailed.value = false
 })
@@ -1401,9 +1487,10 @@ onMounted(async () => {
   })
   void releaseFirstScreen()
   if (typeof window !== 'undefined') {
-    window.addEventListener('resize', updateResultShareMascotSpacing)
+    window.addEventListener('resize', updateResponsiveResultLayouts)
   }
   await nextTick()
+  void scheduleP2ResultAiLayout()
   runtimeMonitor?.checkPageNodes()
 })
 
@@ -1412,12 +1499,13 @@ watch(currentPage, async () => {
     void releaseFirstScreen()
   }
   await nextTick()
+  void scheduleP2ResultAiLayout()
   runtimeMonitor?.checkPageNodes()
 })
 
 onBeforeUnmount(() => {
   if (typeof window !== 'undefined') {
-    window.removeEventListener('resize', updateResultShareMascotSpacing)
+    window.removeEventListener('resize', updateResponsiveResultLayouts)
   }
   runtimeMonitor?.dispose()
   runtimeMonitor = undefined
@@ -1574,7 +1662,7 @@ onBeforeUnmount(() => {
     :class="{ 'is-legacy-p4-route': currentPage === 'p4' }"
     aria-label="P2 今日考运签结果页"
   >
-    <section class="p2-stage" :style="p2StageStyle">
+    <section ref="p2StageRef" class="p2-stage" :style="p2StageLayoutStyle">
       <h1 class="sr-only">六月考运签</h1>
 
       <button
@@ -1602,7 +1690,7 @@ onBeforeUnmount(() => {
           <p class="sr-only">{{ p2SignTag }}</p>
           <section class="p2-fortune-copy" aria-label="今日签文">
             <h2>{{ p2FortuneHeadline }}</h2>
-            <p class="p2-fortune-hint">
+            <p ref="p2SignContentRef" class="p2-fortune-hint">
               <span
                 v-for="line in p2FortuneHintLines"
                 :key="line.id"
@@ -1620,7 +1708,7 @@ onBeforeUnmount(() => {
             </p>
           </section>
 
-          <div class="p2-result-body">
+          <div ref="p2ResultBodyRef" class="p2-result-body">
             <section class="p2-product-hero" aria-label="福利商品">
               <img
                 data-testid="p2-product-image"
@@ -1652,7 +1740,7 @@ onBeforeUnmount(() => {
                 <span class="sr-only">AI 解签，轻触启签</span>
               </button>
 
-              <div class="p2-scroll-body">
+              <div ref="p2AiScrollBodyRef" class="p2-scroll-body">
                 <div v-if="p4ExplainVisible && p4Status === 'loading'" class="p2-ai-loading" role="status">
                   <div class="p4-loading-mark" aria-hidden="true">
                     <span></span>
@@ -1794,7 +1882,7 @@ onBeforeUnmount(() => {
                     decoding="async"
                   />
                 </div>
-                <div class="p2-scroll-body">
+                <div ref="resultShareAiBodyRef" class="p2-scroll-body">
                   <div class="p2-ai-result">
                     <p v-for="line in p4Detail.explainLines.slice(0, 4)" :key="line">{{ line }}</p>
                   </div>

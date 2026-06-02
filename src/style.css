@@ -1831,7 +1831,7 @@ button {
 .p2-ai-panel {
   position: absolute;
   z-index: 3;
-  top: 39.4%;
+  top: var(--p2-ai-top, 39.4%);
   left: 50%;
   width: 76%;
   margin: 0;
@@ -1887,9 +1887,9 @@ button {
 }
 
 .p2-ai-scroll.is-open .p2-scroll-body {
-  min-height: 252px;
-  max-height: 292px;
-  padding: 42px 30px 46px;
+  min-height: var(--p2-ai-body-height, 252px);
+  max-height: var(--p2-ai-body-height, 252px);
+  padding: 34px 28px 36px;
   opacity: 1;
   transform: scaleY(1);
 }
@@ -1905,14 +1905,14 @@ button {
 }
 
 .p2-ai-result {
-  max-height: 200px;
+  max-height: calc(var(--p2-ai-body-height, 252px) - 70px);
   overflow: hidden;
   padding: 1px 4px 0;
 }
 
 .p2-ai-result p {
   font-size: clamp(14px, 3.45vw, 16px);
-  line-height: 1.5;
+  line-height: 1.42;
 }
 
 .p2-ai-result p + p {
@@ -2005,7 +2005,7 @@ button {
 .p2-poster-button {
   position: absolute;
   z-index: 7;
-  top: 66.6%;
+  top: var(--p2-poster-button-top, 66.6%);
   bottom: auto;
   left: 50%;
   width: 24%;
@@ -2027,7 +2027,7 @@ button {
 }
 
 .p2-poster-button.is-explain-open {
-  top: 66.6%;
+  top: var(--p2-poster-button-top, 66.6%);
   bottom: auto;
   opacity: 1;
   pointer-events: auto;

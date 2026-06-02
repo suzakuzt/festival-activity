@@ -518,7 +518,7 @@ describe('P1 activity home', () => {
 
     expect(css).toMatch(/\.p2-fortune-copy p\s*{[^}]*font-size:\s*clamp\(22px,\s*6\.4vw,\s*30px\);/s)
     expect(css).toMatch(/\.p2-fortune-copy p\s*{[^}]*line-height:\s*1\.26;/s)
-    expect(css).toMatch(/\.p2-ai-panel\s*{[^}]*top:\s*39\.4%;/s)
+    expect(css).toMatch(/\.p2-ai-panel\s*{[^}]*top:\s*var\(--p2-ai-top,\s*39\.4%\);/s)
   })
 
   it('keeps the result-page claim button visible after claim and removes the daily check-in entry', () => {
@@ -643,11 +643,12 @@ describe('P1 activity home', () => {
       signContentBottom: 295,
       footerTop: 476,
       minimumSignGapPx: 18,
-      minimumFooterGapPx: 12,
+      minimumFooterGapPx: 28,
+      bodyTopOffsetPx: 42,
     })
 
     expect(layout.topPercent).toBeCloseTo(49, 0)
-    expect(layout.bodyHeightPx).toBeLessThan(170)
+    expect(layout.bodyHeightPx).toBeLessThan(140)
   })
 
   it('lets the result share AI scroll move upward when compact sign copy leaves enough room', () => {
@@ -1138,21 +1139,21 @@ describe('P1 activity home', () => {
     expect(css).toMatch(/\.p2-product-hero\s*{[^}]*left:\s*29%;[^}]*width:\s*22%;[^}]*height:\s*58%;/s)
     expect(css).toMatch(/\.p2-product-hero::after\s*{[^}]*radial-gradient\(ellipse/s)
     expect(css).toMatch(/\.p2-product-hero img\s*{[^}]*transform:\s*rotate\(-4deg\)\s*scale\(0\.92\);/s)
-    expect(css).toMatch(/\.p2-ai-panel\s*{[^}]*top:\s*39\.4%;[^}]*width:\s*76%;/s)
+    expect(css).toMatch(/\.p2-ai-panel\s*{[^}]*top:\s*var\(--p2-ai-top,\s*39\.4%\);[^}]*width:\s*76%;/s)
     expect(css).toMatch(/\.p2-scroll-head\s*{[^}]*width:\s*72%;[^}]*margin:\s*0 auto;/s)
     expect(css).toMatch(/\.p2-scroll-body\s*{[^}]*url\("\/assets\/p4\/element_ai_result_blank_scroll_panel\.webp"\)/s)
     expect(css).toMatch(/\.p2-scroll-body\s*{[^}]*width:\s*94%;[^}]*margin:\s*-16\.5%\s*auto\s*0;/s)
-    expect(css).toMatch(/\.p2-ai-scroll\.is-open \.p2-scroll-body\s*{[^}]*min-height:\s*252px;[^}]*max-height:\s*292px;[^}]*padding:\s*42px\s*30px\s*46px;/s)
-    expect(css).toMatch(/\.p2-ai-result\s*{[^}]*max-height:\s*200px;/s)
+    expect(css).toMatch(/\.p2-ai-scroll\.is-open \.p2-scroll-body\s*{[^}]*min-height:\s*var\(--p2-ai-body-height,\s*252px\);[^}]*max-height:\s*var\(--p2-ai-body-height,\s*252px\);[^}]*padding:\s*34px\s*28px\s*36px;/s)
+    expect(css).toMatch(/\.p2-ai-result\s*{[^}]*max-height:\s*calc\(var\(--p2-ai-body-height,\s*252px\)\s*-\s*70px\);/s)
     expect(css).toMatch(/\.p2-ai-result\s*{[^}]*overflow:\s*hidden;/s)
     expect(css).not.toMatch(/\.p2-ai-result\s*{[^}]*overflow-y:\s*auto;/s)
-    expect(css).toMatch(/\.p2-ai-result p\s*{[^}]*font-size:\s*clamp\(14px,\s*3\.45vw,\s*16px\);/s)
+    expect(css).toMatch(/\.p2-ai-result p\s*{[^}]*font-size:\s*clamp\(14px,\s*3\.45vw,\s*16px\);[^}]*line-height:\s*1\.42;/s)
     expect(css).not.toMatch(/\.p2-scroll-foot\s*{[^}]*radial-gradient/s)
     expect(css).toMatch(/\.p2-ai-loading\s*{[^}]*gap:\s*4px;/s)
     expect(css).toMatch(/\.p2-ai-panel \.p4-thinking-line\s*{[^}]*font-size:\s*13px;/s)
     expect(css).toMatch(/\.p2-claim-button\s*{[^}]*bottom:\s*3\.4%;[^}]*width:\s*56%;/s)
-    expect(css).toMatch(/\.p2-poster-button\s*{[^}]*top:\s*66\.6%;[^}]*bottom:\s*auto;[^}]*width:\s*24%;[^}]*min-height:\s*20px;[^}]*padding:\s*0\s*0\s*3px;[^}]*border-bottom:\s*2px solid #a51d13;[^}]*font-size:\s*clamp\(13px,\s*3\.5vw,\s*15px\);[^}]*font-weight:\s*900;[^}]*letter-spacing:\s*0;/s)
-    expect(css).toMatch(/\.p2-poster-button\.is-explain-open\s*{[^}]*top:\s*66\.6%;[^}]*bottom:\s*auto;[^}]*opacity:\s*1;[^}]*pointer-events:\s*auto;/s)
+    expect(css).toMatch(/\.p2-poster-button\s*{[^}]*top:\s*var\(--p2-poster-button-top,\s*66\.6%\);[^}]*bottom:\s*auto;[^}]*width:\s*24%;[^}]*min-height:\s*20px;[^}]*padding:\s*0\s*0\s*3px;[^}]*border-bottom:\s*2px solid #a51d13;[^}]*font-size:\s*clamp\(13px,\s*3\.5vw,\s*15px\);[^}]*font-weight:\s*900;[^}]*letter-spacing:\s*0;/s)
+    expect(css).toMatch(/\.p2-poster-button\.is-explain-open\s*{[^}]*top:\s*var\(--p2-poster-button-top,\s*66\.6%\);[^}]*bottom:\s*auto;[^}]*opacity:\s*1;[^}]*pointer-events:\s*auto;/s)
     expect(css).toMatch(/\.p2-result-body\s*{[^}]*pointer-events:\s*none;/s)
     expect(css).not.toMatch(/\.p2-poster-button\.is-explain-open\s*{[^}]*pointer-events:\s*none;/s)
     expect(css).toMatch(/\.modal-mask\s*{[^}]*overflow-y:\s*auto;/s)
