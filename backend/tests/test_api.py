@@ -1,5 +1,6 @@
 import unittest
 import gc
+import hashlib
 import os
 import tempfile
 import json
@@ -84,6 +85,8 @@ class ActivityApiFlowTests(unittest.TestCase):
         self._previous_poster_dir = os.environ.get("GAOKAO_H5_POSTER_DIR")
         self._previous_poster_max_bytes = os.environ.get("GAOKAO_H5_POSTER_MAX_BYTES")
         self._previous_admin_token = os.environ.get("GAOKAO_H5_ADMIN_TOKEN")
+        self._previous_wechat_app_id = os.environ.get("GAOKAO_H5_WECHAT_APP_ID")
+        self._previous_wechat_app_secret = os.environ.get("GAOKAO_H5_WECHAT_APP_SECRET")
         self._previous_deepseek_env = {
             key: os.environ.get(key)
             for key in ("DEEPSEEK_API_KEY", "DEEPSEEK_BASE_URL", "DEEPSEEK_MODEL", "DEEPSEEK_REASONING_EFFORT")
@@ -92,6 +95,8 @@ class ActivityApiFlowTests(unittest.TestCase):
         os.environ["GAOKAO_H5_DB_PATH"] = str(self.database_path)
         os.environ["GAOKAO_H5_POSTER_DIR"] = str(self.poster_dir)
         os.environ["GAOKAO_H5_ADMIN_TOKEN"] = "unit-test-admin-token"
+        os.environ.pop("GAOKAO_H5_WECHAT_APP_ID", None)
+        os.environ.pop("GAOKAO_H5_WECHAT_APP_SECRET", None)
         os.environ["DEEPSEEK_API_KEY"] = ""
         os.environ.pop("DEEPSEEK_BASE_URL", None)
         os.environ.pop("DEEPSEEK_MODEL", None)
@@ -127,6 +132,14 @@ class ActivityApiFlowTests(unittest.TestCase):
             os.environ.pop("GAOKAO_H5_ADMIN_TOKEN", None)
         else:
             os.environ["GAOKAO_H5_ADMIN_TOKEN"] = self._previous_admin_token
+        if self._previous_wechat_app_id is None:
+            os.environ.pop("GAOKAO_H5_WECHAT_APP_ID", None)
+        else:
+            os.environ["GAOKAO_H5_WECHAT_APP_ID"] = self._previous_wechat_app_id
+        if self._previous_wechat_app_secret is None:
+            os.environ.pop("GAOKAO_H5_WECHAT_APP_SECRET", None)
+        else:
+            os.environ["GAOKAO_H5_WECHAT_APP_SECRET"] = self._previous_wechat_app_secret
         for key, value in self._previous_deepseek_env.items():
             if value is None:
                 os.environ.pop(key, None)
@@ -649,6 +662,45 @@ class ActivityApiFlowTests(unittest.TestCase):
         self.assertNotIn("page=p1", results[0]["share_url"])
         self.assertEqual(results[-1]["daily_state"]["share_reward_count_today"], 3)
         self.assertEqual(results[-1]["daily_state"]["remaining_draw_count"], 4)
+
+    def test_wechat_jssdk_signature_uses_official_sha1_payload(self):
+        os.environ["GAOKAO_H5_WECHAT_APP_ID"] = "wx_unit_test"
+        os.environ["GAOKAO_H5_WECHAT_APP_SECRET"] = "secret_unit_test"
+        token_payload = {"access_token": "access_test", "expires_in": 7200}
+        ticket_payload = {"ticket": "ticket_test", "expires_in": 7200, "errcode": 0}
+
+        class FakeWechatResponse:
+            def __init__(self, payload):
+                self._payload = payload
+
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return self._payload
+
+        with patch("backend.app.wechat_jssdk.httpx.get", side_effect=[FakeWechatResponse(token_payload), FakeWechatResponse(ticket_payload)]):
+            response = self.client.post(
+                "/api/wechat/jssdk-signature",
+                json={"url": "https://activity.kpcc-tech.com/activity/result?x=1#poster"},
+            )
+
+        self.assertEqual(response.status_code, 200, response.text)
+        payload = response.json()
+        self.assertEqual(payload["appId"], "wx_unit_test")
+        self.assertEqual(payload["url"], "https://activity.kpcc-tech.com/activity/result?x=1")
+        expected_raw = (
+            f"jsapi_ticket=ticket_test&noncestr={payload['nonceStr']}"
+            f"&timestamp={payload['timestamp']}&url=https://activity.kpcc-tech.com/activity/result?x=1"
+        )
+        self.assertEqual(payload["signature"], hashlib.sha1(expected_raw.encode("utf-8")).hexdigest())
+        self.assertIn("updateAppMessageShareData", payload["jsApiList"])
+        self.assertIn("updateTimelineShareData", payload["jsApiList"])
+
+    def test_wechat_jssdk_signature_requires_official_account_config(self):
+        response = self.client.post("/api/wechat/jssdk-signature", json={"url": "https://activity.kpcc-tech.com/activity/result"})
+
+        self.assertEqual(response.status_code, 503)
 
     def test_claimed_coupon_appears_in_reward_center_and_gift_is_last(self):
         session = self._create_session()

@@ -31,6 +31,7 @@ from .activity_service import (
 from .health import build_health_status
 from .local_env import load_local_env
 from .poster_service import resolve_poster_path, save_poster
+from .wechat_jssdk import build_wechat_jssdk_signature
 
 
 def _configure_logging() -> None:
@@ -104,6 +105,10 @@ class BenefitRandomizeRequest(BaseModel):
 class ShareRecordRequest(BaseModel):
     session_token: str
     share_channel: str | None = None
+
+
+class WechatJssdkSignatureRequest(BaseModel):
+    url: str
 
 
 class TrackingEventRequest(BaseModel):
@@ -300,6 +305,14 @@ def benefit_claim_resolve(claim_token: str = Query(...)):
 def share_record(request: ShareRecordRequest):
     try:
         return record_share(request.model_dump())
+    except ApiError as error:
+        _handle_api_error(error)
+
+
+@app.post("/api/wechat/jssdk-signature")
+def wechat_jssdk_signature(request: WechatJssdkSignatureRequest):
+    try:
+        return build_wechat_jssdk_signature(request.url)
     except ApiError as error:
         _handle_api_error(error)
 

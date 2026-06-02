@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import sharp from 'sharp'
 import { mount } from '@vue/test-utils'
 import { defineComponent } from 'vue'
 import App from './App.vue'
@@ -13,6 +14,7 @@ import {
   goMiniProgramCouponPage,
   goMiniProgramPosterSavePage,
 } from './utils/miniProgramBridge'
+import { calculateResultShareAiLayout, calculateResultShareMascotTopPercent } from './utils/resultShareLayout'
 import { installRuntimeMonitor } from './utils/runtimeMonitor'
 
 vi.mock('./components/HelloWorld.vue', () => ({
@@ -58,6 +60,7 @@ const readSource = (relativePath) => readFileSync(resolve(process.cwd(), relativ
 const readBinary = (relativePath) => readFileSync(resolve(process.cwd(), relativePath))
 const sha256File = (relativePath) => createHash('sha256').update(readBinary(relativePath)).digest('hex').toUpperCase()
 const fileSizeKb = (relativePath) => Math.round((readBinary(relativePath).length / 1024) * 10) / 10
+const readImageMetadata = (relativePath) => sharp(resolve(process.cwd(), relativePath)).metadata()
 
 const readPngSize = (relativePath) => {
   const buffer = readBinary(relativePath)
@@ -98,12 +101,19 @@ describe('P1 activity home', () => {
     )
   })
 
-  it('uses metadata preload for the draw animation video instead of downloading the full animation eagerly', () => {
-    const source = readSource('src/App.vue')
+  it('uses the lottery tube shake fallback instead of the transparent video animation', async () => {
+    const canPlayTypeSpy = vi.spyOn(window.HTMLMediaElement.prototype, 'canPlayType').mockReturnValue('probably')
 
-    expect(source).not.toContain('preload="auto"')
-    expect(source).toContain('preload="metadata"')
-    expect(source).toContain('drawAnimationVideoSrc')
+    try {
+      const wrapper = mountHome()
+
+      await wrapper.get('[data-testid="draw-button"]').trigger('click')
+
+      expect(wrapper.find('[data-testid="draw-animation-video"]').exists()).toBe(false)
+      expect(wrapper.get('[data-testid="draw-animation-fallback"]').exists()).toBe(true)
+    } finally {
+      canPlayTypeSpy.mockRestore()
+    }
   })
 
   it('shows the home page only after first-screen core image preloading is released', () => {
@@ -392,6 +402,19 @@ describe('P1 activity home', () => {
     expect(css).toMatch(/\.lottery-shadow\s*{[^}]*mix-blend-mode:\s*multiply;/s)
   })
 
+  it('keeps iOS web-view fallbacks for viewport and stage sizing', () => {
+    const css = readSource('src/style.css')
+
+    expect(css).toContain('--h5-stage-height: min(177.7778vw, 764.4445px);')
+    expect(css).toContain('--p2-result-stage-height: min(177.6833vw, 764.0383px);')
+    expect(css).toMatch(/#app\s*{[^}]*min-height:\s*100vh;[^}]*min-height:\s*100svh;/s)
+    expect(css).toMatch(/\.home-page\s*{[^}]*min-height:\s*100vh;[^}]*min-height:\s*100svh;/s)
+    expect(css).toMatch(/\.home-stage\s*{[^}]*height:\s*var\(--h5-stage-height\);[^}]*aspect-ratio:\s*var\(--h5-stage-ratio\);/s)
+    expect(css).toMatch(/\.p2-stage\s*{[^}]*height:\s*var\(--h5-stage-height\);[^}]*aspect-ratio:\s*var\(--h5-stage-ratio\);/s)
+    expect(css).toMatch(/\.p2-stage\s*{[^}]*width:\s*min\(100vw,\s*430px\);[^}]*height:\s*177\.6833vw;[^}]*height:\s*var\(--p2-result-stage-height\);[^}]*aspect-ratio:\s*941\s*\/\s*1672;/s)
+    expect(css).toMatch(/\.draw-animation-shell\s*{[^}]*height:\s*var\(--h5-stage-height\);[^}]*aspect-ratio:\s*var\(--h5-stage-ratio\);/s)
+  })
+
   it('routes to the P2 placeholder when the primary draw button has chance', async () => {
     const wrapper = mountHome()
 
@@ -525,30 +548,49 @@ describe('P1 activity home', () => {
     expect(wrapper.text()).not.toContain('压力自动降噪')
   })
 
-  it('opens the activity share poster without the product image or WeCom fallback QR before share link is ready', async () => {
+  it('opens the result share popup as the reused fortune poster with WeCom QR and a random mascot before AI explanation', async () => {
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.4)
     const wrapper = mountResult({
       initialP2Result: {
-        goodFor: 'LEFT_COPY',
-        avoid: 'RIGHT_COPY',
+        signType: 'SIGN_TITLE',
+        signLevel: 'TOP_LEVEL',
+        fortuneHeadline: 'SIGN_TITLE',
+        fortuneHint: 'LINE_ONE，LINE_TWO。',
+        mainTextColumns: ['LINE_ONE', 'LINE_TWO'],
       },
       initialP4Detail: {
-        product: {
-          productName: 'PRODUCT_NAME',
-          productImage: 'product_flat_iron_steak.png',
-        },
+        explainLines: ['AI_LINE_SHOULD_NOT_SHOW_YET'],
       },
     })
 
     await wrapper.get('[data-testid="share-poster"]').trigger('click')
 
     const poster = wrapper.get('[data-testid="p2-poster-dialog"]')
-    expect(poster.find('[data-testid="p2-share-activity-poster"]').attributes('src')).toContain(
-      'share_activity_poster.webp',
+    expect(poster.get('[data-testid="result-share-card"]').classes()).toContain('result-share-card')
+    expect(poster.get('[data-testid="result-share-poster-surface"]').classes()).toContain('p2-combined-card')
+    expect(poster.get('[data-testid="result-share-poster-surface"]').attributes('style')).toContain(
+      'bg_result_share_no_ai.webp',
     )
+    expect(poster.get('[data-testid="result-share-brand-logo"]').attributes('src')).toContain(
+      'logo_prime_cuts_home.webp',
+    )
+    expect(poster.get('[data-testid="result-share-brand-logo"]').attributes('alt')).toBe('Prime Cuts 璞莱牧')
+    expect(poster.get('[data-testid="result-share-fortune-copy"]').classes()).toContain('p2-fortune-copy')
+    expect(poster.get('[data-testid="result-share-sign-title"]').text()).toContain('SIGN_TITLE')
+    expect(poster.get('[data-testid="result-share-sign-content"]').text()).toContain('LINE_ONE')
+    expect(poster.get('[data-testid="result-share-sign-content"]').text()).toContain('LINE_TWO')
+    expect(poster.get('[data-testid="result-share-scroll-mascot"]').attributes('src')).toContain(
+      'share_mascot_zhuangyuan.webp',
+    )
+    expect(poster.find('[data-testid="result-share-ai-explain"]').exists()).toBe(false)
+    expect(poster.get('[data-testid="result-share-wecom-qrcode"]').attributes('src')).toContain(
+      'qrcode_wechat_group.png',
+    )
+    expect(poster.find('[data-testid="result-share-gift-title"]').exists()).toBe(false)
+    expect(poster.find('[data-testid="result-share-footer-mascot"]').exists()).toBe(false)
+    expect(poster.find('[data-testid="result-share-footer-mascot-decor"]').exists()).toBe(false)
+    expect(poster.find('[data-testid="p2-share-activity-poster"]').exists()).toBe(false)
     expect(poster.find('[data-testid="p2-poster-qrcode"]').exists()).toBe(false)
-    expect(poster.find('[data-testid="p2-product-image"]').exists()).toBe(false)
-    expect(poster.html()).not.toContain('product_flat_iron_steak.webp')
-    expect(poster.html()).not.toContain('qrcode_wechat_group')
     expect(poster.find('[data-testid="save-p2-poster"]').exists()).toBe(false)
     expect(poster.get('[data-testid="p2-poster-longpress-tip"]').text()).toBe('长按海报可保存/分享')
     expect(poster.get('[data-testid="close-p2-panel"]').attributes('aria-label')).toBe('关闭')
@@ -556,6 +598,149 @@ describe('P1 activity home', () => {
     await poster.get('[data-testid="close-p2-panel"]').trigger('click')
 
     expect(wrapper.find('[data-testid="p2-poster-dialog"]').exists()).toBe(false)
+    randomSpy.mockRestore()
+  })
+
+  it('keeps the result share title visually centered in the plaque', () => {
+    const css = readFileSync('src/style.css', 'utf-8')
+
+    expect(css).toContain('.result-share-fortune-copy h2')
+    expect(css).toContain('min-height: 46px')
+    expect(css).toContain('translateY(-18px)')
+  })
+
+  it('places the result share mascot below dynamic sign content with a minimum gap', () => {
+    const topPercent = calculateResultShareMascotTopPercent({
+      surfaceTop: 24,
+      surfaceHeight: 590,
+      signContentBottom: 295,
+      minimumGapPx: 18,
+      minTopPercent: 47,
+      maxTopPercent: 52,
+    })
+
+    expect(topPercent).toBeCloseTo(49, 0)
+  })
+
+  it('places the result share AI scroll between sign content and footer with breathing room', () => {
+    const layout = calculateResultShareAiLayout({
+      surfaceTop: 24,
+      surfaceHeight: 590,
+      signContentBottom: 295,
+      footerTop: 476,
+      minimumSignGapPx: 18,
+      minimumFooterGapPx: 12,
+    })
+
+    expect(layout.topPercent).toBeCloseTo(49, 0)
+    expect(layout.bodyHeightPx).toBeLessThan(170)
+  })
+
+  it('lets the result share AI scroll move upward when compact sign copy leaves enough room', () => {
+    const layout = calculateResultShareAiLayout({
+      surfaceTop: 24,
+      surfaceHeight: 590,
+      signContentBottom: 261,
+      footerTop: 476,
+    })
+
+    expect(layout.topPercent).toBe(44)
+    expect(layout.bodyHeightPx).toBeGreaterThan(160)
+  })
+
+  it('shows AI explanation with the reused scroll and without the replacement mascot after AI has opened', async () => {
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.99)
+    const wrapper = mountResult({
+      initialP2Result: {
+        fortuneHeadline: 'AI_READY_SIGN',
+        fortuneHint: 'SIGN_BODY',
+        mainTextColumns: ['SIGN_BODY'],
+      },
+      initialP4Detail: {
+        explainLines: ['AI_RESULT_LINE'],
+      },
+    })
+
+    await wrapper.get('[data-testid="ask-xiaopu"]').trigger('click')
+    await wrapper.get('[data-testid="share-poster"]').trigger('click')
+
+    const poster = wrapper.get('[data-testid="p2-poster-dialog"]')
+    expect(poster.get('[data-testid="result-share-poster-surface"]').classes()).toContain('is-ai-share')
+    expect(poster.get('[data-testid="result-share-poster-surface"]').attributes('style')).toContain(
+      'bg_result_share_ai.webp',
+    )
+    expect(poster.get('[data-testid="result-share-ai-explain"]').classes()).toContain('p2-ai-panel')
+    expect(poster.get('[data-testid="result-share-ai-scroll"]').classes()).toContain('p2-ai-scroll')
+    expect(poster.get('[data-testid="result-share-ai-scroll"]').classes()).toContain('is-open')
+    expect(poster.get('[data-testid="result-share-poster-surface"]').attributes('style')).toContain(
+      '--result-share-ai-top',
+    )
+    expect(poster.get('[data-testid="result-share-poster-surface"]').attributes('style')).toContain(
+      '--result-share-ai-body-height',
+    )
+    expect(poster.get('[data-testid="result-share-ai-explain"]').text()).toContain('AI_RESULT_LINE')
+    expect(poster.find('[data-testid="result-share-scroll-mascot"]').exists()).toBe(false)
+    expect(poster.get('[data-testid="result-share-footer-mascot"]').attributes('src')).toContain(
+      'share_mascot_bangyan.webp',
+    )
+    expect(poster.get('[data-testid="result-share-footer-goodluck-icon"]').attributes('src')).toContain(
+      'element_good_luck_0842.webp',
+    )
+    randomSpy.mockRestore()
+  })
+
+  it('uses 90/5/5 weighted odds for the result share replacement mascot before AI explanation', async () => {
+    const randomSpy = vi
+      .spyOn(Math, 'random')
+      .mockReturnValueOnce(0.89)
+      .mockReturnValueOnce(0.94)
+      .mockReturnValueOnce(0.99)
+    const wrapper = mountResult()
+
+    await wrapper.get('[data-testid="share-poster"]').trigger('click')
+    const firstMascot = wrapper.get('[data-testid="result-share-scroll-mascot"]').attributes('src')
+    expect(wrapper.find('[data-testid="result-share-footer-mascot"]').exists()).toBe(false)
+    await wrapper.get('[data-testid="close-p2-panel"]').trigger('click')
+    await wrapper.get('[data-testid="share-poster"]').trigger('click')
+    const secondMascot = wrapper.get('[data-testid="result-share-scroll-mascot"]').attributes('src')
+    expect(wrapper.find('[data-testid="result-share-footer-mascot"]').exists()).toBe(false)
+    await wrapper.get('[data-testid="close-p2-panel"]').trigger('click')
+    await wrapper.get('[data-testid="share-poster"]').trigger('click')
+    const thirdMascot = wrapper.get('[data-testid="result-share-scroll-mascot"]').attributes('src')
+    expect(wrapper.find('[data-testid="result-share-footer-mascot"]').exists()).toBe(false)
+
+    expect(firstMascot).toContain('share_mascot_zhuangyuan.webp')
+    expect(secondMascot).toContain('share_mascot_tanhua.webp')
+    expect(thirdMascot).toContain('share_mascot_bangyan.webp')
+    randomSpy.mockRestore()
+  })
+
+  it('uses 90/5/5 weighted odds for the AI footer mascot', async () => {
+    const randomSpy = vi
+      .spyOn(Math, 'random')
+      .mockReturnValueOnce(0.89)
+      .mockReturnValueOnce(0.94)
+      .mockReturnValueOnce(0.99)
+    const wrapper = mountResult({
+      initialP4Detail: {
+        explainLines: ['AI_RESULT_LINE'],
+      },
+    })
+
+    await wrapper.get('[data-testid="ask-xiaopu"]').trigger('click')
+    await wrapper.get('[data-testid="share-poster"]').trigger('click')
+    const firstMascot = wrapper.get('[data-testid="result-share-footer-mascot"]').attributes('src')
+    await wrapper.get('[data-testid="close-p2-panel"]').trigger('click')
+    await wrapper.get('[data-testid="share-poster"]').trigger('click')
+    const secondMascot = wrapper.get('[data-testid="result-share-footer-mascot"]').attributes('src')
+    await wrapper.get('[data-testid="close-p2-panel"]').trigger('click')
+    await wrapper.get('[data-testid="share-poster"]').trigger('click')
+    const thirdMascot = wrapper.get('[data-testid="result-share-footer-mascot"]').attributes('src')
+
+    expect(firstMascot).toContain('share_mascot_zhuangyuan.webp')
+    expect(secondMascot).toContain('share_mascot_tanhua.webp')
+    expect(thirdMascot).toContain('share_mascot_bangyan.webp')
+    randomSpy.mockRestore()
   })
 
   it('adds a draw chance and uses the tracked share link when opening the home share poster', async () => {
@@ -613,28 +798,135 @@ describe('P1 activity home', () => {
 
     expect(recordShare).toHaveBeenCalledWith({ session_token: 'sess_result_share', share_channel: 'result_share' })
     expect(wrapper.get('[data-testid="p2-poster-dialog"]').exists()).toBe(true)
-    expect(decodeURIComponent(wrapper.get('[data-testid="p2-poster-qrcode"]').attributes('src'))).toContain(
-      '/activity/home?share_token=SH_RESULT_TEST',
+    expect(wrapper.find('[data-testid="p2-poster-qrcode"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="result-share-wecom-qrcode"]').attributes('src')).toContain(
+      'qrcode_wechat_group.png',
     )
   })
 
-  it('uses the approved 2026-05-26 activity poster asset for every share entry', async () => {
+  it('configures WeChat friend and timeline share cards with the tracked result share link', async () => {
+    const config = vi.fn()
+    const ready = vi.fn((callback) => callback())
+    const error = vi.fn()
+    const updateAppMessageShareData = vi.fn()
+    const updateTimelineShareData = vi.fn()
+    window.wx = {
+      config,
+      ready,
+      error,
+      updateAppMessageShareData,
+      updateTimelineShareData,
+    }
+    const createSession = vi.fn().mockResolvedValue({ session_token: 'sess_wx_share' })
+    const recordShare = vi.fn().mockResolvedValue({
+      success: true,
+      share_token: 'SH_WX_RESULT',
+      share_url: '/activity/home?share_token=SH_WX_RESULT',
+      reward_granted: true,
+      daily_state: {
+        remaining_draw_count: 2,
+        share_reward_count_today: 1,
+      },
+    })
+    const getWechatJssdkSignature = vi.fn().mockResolvedValue({
+      appId: 'wx_test_app',
+      timestamp: 1717200000,
+      nonceStr: 'nonce_test',
+      signature: 'signature_test',
+      jsApiList: ['updateAppMessageShareData', 'updateTimelineShareData'],
+    })
+    const wrapper = mountResult({
+      apiClient: {
+        createSession,
+        recordShare,
+        getWechatJssdkSignature,
+        trackEvent: vi.fn().mockResolvedValue({}),
+      },
+      initialP2Result: {
+        fortuneHeadline: '过儿签',
+        fortuneHint: '考试期间，不要叫我真名，叫我过儿。',
+      },
+    })
+
+    await wrapper.get('[data-testid="share-poster"]').trigger('click')
+    await flushPromises()
+
+    expect(getWechatJssdkSignature).toHaveBeenCalledWith({
+      url: expect.stringContaining('/activity/result'),
+    })
+    expect(config).toHaveBeenCalledWith(
+      expect.objectContaining({
+        appId: 'wx_test_app',
+        timestamp: 1717200000,
+        nonceStr: 'nonce_test',
+        signature: 'signature_test',
+        jsApiList: expect.arrayContaining(['updateAppMessageShareData', 'updateTimelineShareData']),
+      }),
+    )
+    expect(updateAppMessageShareData).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: expect.stringContaining('过儿签'),
+        desc: expect.stringContaining('PrimeCuts'),
+        link: 'http://localhost/activity/home?share_token=SH_WX_RESULT',
+        imgUrl: expect.stringContaining('/assets/share/share_activity_poster.webp'),
+      }),
+    )
+    expect(updateTimelineShareData).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: expect.stringContaining('过儿签'),
+        link: 'http://localhost/activity/home?share_token=SH_WX_RESULT',
+        imgUrl: expect.stringContaining('/assets/share/share_activity_poster.webp'),
+      }),
+    )
+  })
+
+  it('uses the approved 2026-05-26 activity poster asset for the home share entry', async () => {
     const home = mountHome()
-    const result = mountResult()
     const approvedPosterHash = '62511C56BBA69EF1C74A4F5384A3774A1982739ECC346D797A7EF08AB0366E17'
 
     expect(sha256File('public/assets/share/share_activity_poster.webp')).toBe(approvedPosterHash)
     expect(fileSizeKb('public/assets/share/share_activity_poster.webp')).toBeLessThan(500)
 
     await home.get('[data-testid="share-entry"]').trigger('click')
-    await result.get('[data-testid="share-poster"]').trigger('click')
 
     expect(home.get('[data-testid="home-share-activity-poster"]').find('.activity-share-poster-image').attributes('src')).toContain(
       'share_activity_poster.webp',
     )
-    expect(result.get('[data-testid="p2-share-activity-poster"]').attributes('src')).toContain(
-      'share_activity_poster.webp',
-    )
+  })
+
+  it('keeps the result share mascot assets transparent and web-optimized', async () => {
+    expect(fileSizeKb('public/assets/p4/share_mascot_zhuangyuan.webp')).toBeLessThan(150)
+    expect(fileSizeKb('public/assets/p4/share_mascot_tanhua.webp')).toBeLessThan(150)
+    expect(fileSizeKb('public/assets/p4/share_mascot_bangyan.webp')).toBeLessThan(150)
+    expect(fileSizeKb('public/assets/p4/element_good_luck_0842.webp')).toBeLessThan(100)
+    await expect(readImageMetadata('public/assets/p4/share_mascot_zhuangyuan.webp')).resolves.toMatchObject({
+      hasAlpha: true,
+    })
+    await expect(readImageMetadata('public/assets/p4/share_mascot_tanhua.webp')).resolves.toMatchObject({
+      hasAlpha: true,
+    })
+    await expect(readImageMetadata('public/assets/p4/share_mascot_bangyan.webp')).resolves.toMatchObject({
+      hasAlpha: true,
+    })
+    await expect(readImageMetadata('public/assets/p4/element_good_luck_0842.webp')).resolves.toMatchObject({
+      hasAlpha: true,
+      width: 420,
+    })
+  })
+
+  it('keeps the result share popup background variants web-optimized', async () => {
+    expect(fileSizeKb('public/assets/p4/bg_result_share_ai.webp')).toBeLessThan(500)
+    expect(fileSizeKb('public/assets/p4/bg_result_share_no_ai.webp')).toBeLessThan(500)
+    await expect(readImageMetadata('public/assets/p4/bg_result_share_ai.webp')).resolves.toMatchObject({
+      width: 941,
+      height: 1672,
+      hasAlpha: true,
+    })
+    await expect(readImageMetadata('public/assets/p4/bg_result_share_no_ai.webp')).resolves.toMatchObject({
+      width: 941,
+      height: 1672,
+      hasAlpha: true,
+    })
   })
 
   it('renders the home share poster as one generated image before users long-press it', async () => {
@@ -692,7 +984,7 @@ describe('P1 activity home', () => {
     toDataUrlSpy.mockRestore()
   })
 
-  it('renders the result share poster as one generated image before users long-press it', async () => {
+  it('keeps the result share popup as the dedicated sign poster instead of the generic activity poster', async () => {
     const previewDataUrl = 'data:image/png;base64,result-composed-preview'
     const createSession = vi.fn().mockResolvedValue({ session_token: 'sess_result' })
     const recordShare = vi.fn().mockResolvedValue({
@@ -734,12 +1026,13 @@ describe('P1 activity home', () => {
     await wrapper.get('[data-testid="share-poster"]').trigger('click')
     await flushPromises()
 
-    expect(wrapper.find('[data-testid="p2-poster-card"]').exists()).toBe(false)
-    expect(wrapper.get('[data-testid="p2-poster-generated-preview"]').attributes('src')).toBe(previewDataUrl)
+    expect(wrapper.get('[data-testid="result-share-card"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="p2-share-activity-poster"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="p2-poster-generated-preview"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="save-p2-poster"]').exists()).toBe(false)
     expect(wrapper.get('[data-testid="p2-poster-longpress-tip"]').text()).toBe('长按海报可保存/分享')
-    expect(canvasContext.fillRect).toHaveBeenCalled()
-    expect(canvasContext.drawImage).toHaveBeenCalled()
+    expect(canvasContext.fillRect).not.toHaveBeenCalled()
+    expect(canvasContext.drawImage).not.toHaveBeenCalled()
 
     wrapper.unmount()
     globalThis.Image = originalImage
@@ -836,6 +1129,33 @@ describe('P1 activity home', () => {
     expect(css).toMatch(/\.p2-poster-dialog\s*{[^}]*display:\s*flex;[^}]*flex-direction:\s*column;/s)
     expect(css).toMatch(/\.p2-poster-dialog\s*{[^}]*max-height:\s*calc\(100svh - 48px - var\(--safe-top\) - var\(--safe-bottom\)\);/s)
     expect(css).toMatch(/\.p2-poster-card\s*{[^}]*background:\s*#a10805;[^}]*overflow:\s*hidden;/s)
+    expect(css).toMatch(/\.result-share-card\s*{[^}]*aspect-ratio:\s*941\s*\/\s*1672;/s)
+    expect(css).toMatch(
+      /\.result-share-poster-surface\s*{[^}]*background-image:\s*var\(--result-share-poster-bg,\s*url\("\/assets\/p4\/bg_result_share_no_ai\.webp"\)\);/s,
+    )
+    expect(css).toMatch(/\.result-share-brand-logo\s*{[^}]*top:\s*4\.2%;[^}]*left:\s*10\.8%;[^}]*width:\s*22%;/s)
+    expect(css).toMatch(/\.result-share-brand-logo\s*{[^}]*object-fit:\s*contain;/s)
+    expect(css).not.toContain('.result-share-brand-badge')
+    expect(css).toMatch(/\.result-share-fortune-copy\s*{[^}]*top:\s*10\.2%;/s)
+    expect(css).toMatch(
+      /\.result-share-scroll-mascot\s*{[^}]*top:\s*var\(--result-share-mascot-top,\s*47%\);[^}]*width:\s*44%;[^}]*height:\s*20%;[^}]*object-fit:\s*contain;/s,
+    )
+    expect(css).toMatch(/\.result-share-ai-panel\s*{[^}]*top:\s*var\(--result-share-ai-top,\s*47%\);/s)
+    expect(css).toMatch(
+      /\.result-share-ai-scroll\.is-open \.p2-scroll-body\s*{[^}]*min-height:\s*var\(--result-share-ai-body-height,\s*168px\);/s,
+    )
+    expect(css).toMatch(/\.result-share-footer-qrcode\s*{[^}]*top:\s*83\.8%;[^}]*left:\s*25\.8%;/s)
+    expect(css).toMatch(/\.result-share-footer-qrcode\s*{[^}]*width:\s*24\.5%;/s)
+    expect(css).toMatch(/\.result-share-footer-qrcode\s*{[^}]*transform:\s*translate\(-50%,\s*-50%\);/s)
+    expect(css).toMatch(/\.result-share-footer-mascot\s*{[^}]*top:\s*84%;[^}]*left:\s*58\.5%;/s)
+    expect(css).toMatch(/\.result-share-footer-mascot\s*{[^}]*width:\s*31%;/s)
+    expect(css).toMatch(/\.result-share-footer-mascot\s*{[^}]*transform:\s*translate\(-50%,\s*-50%\);/s)
+    expect(css).toMatch(/\.result-share-footer-mascot-decor\s*{[^}]*top:\s*76\.6%;[^}]*left:\s*72\.8%;/s)
+    expect(css).toMatch(/\.result-share-footer-mascot-decor\s*{[^}]*width:\s*13\.2%;[^}]*height:\s*15%;/s)
+    expect(css).toMatch(/\.result-share-footer-goodluck-icon\s*{[^}]*object-fit:\s*contain;/s)
+    expect(css).not.toContain('.result-share-footer-mascot-seal')
+    expect(css).not.toContain('.result-share-footer-mascot-cloud')
+    expect(css).not.toContain('.result-share-footer-mascot-tassel')
     expect(css).toMatch(/\.activity-share-poster-image\s*{[^}]*aspect-ratio:\s*941\s*\/\s*1672;/s)
     expect(css).toMatch(/\.activity-share-poster-qrcode\s*{[^}]*left:\s*15%;[^}]*top:\s*84\.7%;[^}]*width:\s*21\.2%;/s)
     expect(css).toMatch(/\.p2-poster-generated-preview\s*{[^}]*max-height:\s*min\(calc\(100svh - 170px - var\(--safe-top\) - var\(--safe-bottom\)\),\s*640px\);/s)

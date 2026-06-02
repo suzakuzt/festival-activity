@@ -3,8 +3,10 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { activityApi } from './api/activityApi'
 import { useP1Activity } from './composables/useP1Activity'
 import { goMiniProgramPosterSavePage } from './utils/miniProgramBridge'
+import { calculateResultShareAiLayout, calculateResultShareMascotTopPercent } from './utils/resultShareLayout'
 import { installRuntimeMonitor } from './utils/runtimeMonitor'
 import { createShareQrcodeDataUrl } from './utils/shareQrcode'
+import { configureWechatShare } from './utils/wechatShare'
 
 const props = defineProps({
   initialPage: {
@@ -172,6 +174,18 @@ const p6ImageAsset = (name) => localImageAsset(p6Asset, name)
 const p7ImageAsset = (name) => localImageAsset(p7Asset, name)
 const p8ImageAsset = (name) => localImageAsset(p8Asset, name)
 const activitySharePosterSrc = ref('')
+const resultSharePosterSurfaceRef = ref(null)
+const resultShareSignContentRef = ref(null)
+const resultShareFooterQrcodeRef = ref(null)
+const resultShareMascotTopPercent = ref(47)
+const resultShareAiTopPercent = ref(47)
+const resultShareAiBodyHeightPx = ref(168)
+const RESULT_SHARE_MASCOTS = [
+  { id: 'zhuangyuan', src: p4ImageAsset('share_mascot_zhuangyuan.webp'), alt: '状元牛', weight: 0.9 },
+  { id: 'tanhua', src: p4ImageAsset('share_mascot_tanhua.webp'), alt: '探花牛', weight: 0.05 },
+  { id: 'bangyan', src: p4ImageAsset('share_mascot_bangyan.webp'), alt: '榜眼牛', weight: 0.05 },
+]
+const resultShareMascotIndex = ref(0)
 const ensureActivitySharePosterSrc = () => {
   if (!activitySharePosterSrc.value) {
     activitySharePosterSrc.value = shareAsset('share_activity_poster.webp')
@@ -179,7 +193,6 @@ const ensureActivitySharePosterSrc = () => {
 
   return activitySharePosterSrc.value
 }
-const drawAnimationVideoSrc = computed(() => (showDrawAnimation.value ? homeAsset('CQ2-transparent-3s.webm') : ''))
 const FIRST_SCREEN_TIMEOUT_MS = import.meta.env.MODE === 'test' ? 0 : 4000
 const firstScreenImages = [
   homeImageAsset('bg_rank_success.jpg'),
@@ -252,26 +265,6 @@ const homeBarrageTrackStyle = {
 const stageStyle = computed(() => ({
   backgroundImage: `url(${homeImageAsset('bg_rank_success.jpg')})`,
 }))
-const playDrawAnimation = (event) => {
-  event.currentTarget?.play?.().catch(() => {})
-}
-const canUseTransparentDrawVideo = computed(() => {
-  if (typeof document === 'undefined' || typeof navigator === 'undefined') {
-    return false
-  }
-
-  const userAgent = navigator.userAgent || ''
-  if (/MicroMessenger|iPhone|iPad|iPod/i.test(userAgent)) {
-    return false
-  }
-
-  const video = document.createElement('video')
-  return Boolean(
-    video.canPlayType('video/webm; codecs="vp9"') ||
-      video.canPlayType('video/webm; codecs="vp8"') ||
-      video.canPlayType('video/webm'),
-  )
-})
 const p2StageStyle = computed(() => ({
   backgroundImage: `url(${p4ImageAsset('bg_ai_result_page.png')})`,
 }))
@@ -336,6 +329,81 @@ const p2FortuneHintLines = computed(() => {
     segments: splitFortuneHighlightSegments(line, p2FortuneHighlightText.value),
   }))
 })
+const pickResultShareMascot = () => {
+  if (RESULT_SHARE_MASCOTS.length <= 1) {
+    resultShareMascotIndex.value = 0
+    return
+  }
+
+  const randomValue = Math.random()
+  let cumulativeWeight = 0
+  const pickedIndex = RESULT_SHARE_MASCOTS.findIndex((mascot) => {
+    cumulativeWeight += mascot.weight
+    return randomValue < cumulativeWeight
+  })
+  resultShareMascotIndex.value = pickedIndex >= 0 ? pickedIndex : RESULT_SHARE_MASCOTS.length - 1
+}
+const resultShareMascot = computed(() => RESULT_SHARE_MASCOTS[resultShareMascotIndex.value] ?? RESULT_SHARE_MASCOTS[0])
+const resultSharePosterSpacingStyle = computed(() => ({
+  '--result-share-poster-bg': `url("${p4ImageAsset(
+    hasResultShareAiExplain.value ? 'bg_result_share_ai.webp' : 'bg_result_share_no_ai.webp',
+  )}")`,
+  '--result-share-mascot-top': `${resultShareMascotTopPercent.value}%`,
+  '--result-share-ai-top': `${resultShareAiTopPercent.value}%`,
+  '--result-share-ai-body-height': `${resultShareAiBodyHeightPx.value}px`,
+}))
+const hasResultShareAiExplain = computed(
+  () =>
+    p4ExplainVisible.value &&
+    p4Status.value === 'success' &&
+    Array.isArray(p4Detail.value.explainLines) &&
+    p4Detail.value.explainLines.length > 0,
+)
+const updateResultShareMascotSpacing = () => {
+  const surface = resultSharePosterSurfaceRef.value
+  const signContent = resultShareSignContentRef.value
+  if (!surface || !signContent) {
+    resultShareMascotTopPercent.value = 47
+    resultShareAiTopPercent.value = 47
+    resultShareAiBodyHeightPx.value = 168
+    return
+  }
+
+  const surfaceRect = surface.getBoundingClientRect()
+  const signContentRect = signContent.getBoundingClientRect()
+  if (hasResultShareAiExplain.value) {
+    const footerRect = resultShareFooterQrcodeRef.value?.getBoundingClientRect()
+    const layout = calculateResultShareAiLayout({
+      surfaceTop: surfaceRect.top,
+      surfaceHeight: surfaceRect.height,
+      signContentBottom: signContentRect.bottom,
+      footerTop: footerRect?.top,
+    })
+    resultShareMascotTopPercent.value = 47
+    resultShareAiTopPercent.value = Number(layout.topPercent.toFixed(2))
+    resultShareAiBodyHeightPx.value = layout.bodyHeightPx
+    return
+  }
+
+  resultShareMascotTopPercent.value = Number(
+    calculateResultShareMascotTopPercent({
+      surfaceTop: surfaceRect.top,
+      surfaceHeight: surfaceRect.height,
+      signContentBottom: signContentRect.bottom,
+    }).toFixed(2),
+  )
+  resultShareAiTopPercent.value = 47
+  resultShareAiBodyHeightPx.value = 168
+}
+const scheduleResultShareMascotSpacing = async () => {
+  await nextTick()
+  if (typeof requestAnimationFrame === 'function') {
+    requestAnimationFrame(updateResultShareMascotSpacing)
+    return
+  }
+
+  updateResultShareMascotSpacing()
+}
 const splitGlyphs = (text = '') => Array.from(text)
 const P2_SIDE_COMFORT_GLYPH_LIMIT = 10
 const P2_SIDE_MAX_GLYPH_LIMIT = 12
@@ -575,6 +643,7 @@ const POSTER_LONGPRESS_TIP = '长按海报可保存/分享'
 const POSTER_SAVE_SUCCESS_MESSAGE = '保存成功，手机端请长按上方图片保存到相册'
 const POSTER_GENERATED_MESSAGE = '海报已生成，手机端请长按上方图片保存到相册'
 const MINI_PROGRAM_POSTER_SAVE_MESSAGE = '正在打开小程序保存到相册...'
+const RESULT_WECHAT_SHARE_DESC = 'PrimeCuts 璞莱牧高考考运签，抽签还能领好礼'
 const toAbsolutePosterUrl = (posterUrl) => {
   if (!posterUrl) {
     return ''
@@ -608,6 +677,38 @@ const updateSharePosterQrcode = async (shareResult) => {
   } catch {
     sharePosterQrcodeSrc.value = ''
     return false
+  }
+}
+const configureResultWechatShare = async (shareResult) => {
+  if (!shareResult?.share_url) {
+    return
+  }
+
+  const shareTitle = `我抽到了「${p2FortuneHeadline.value}」，快来测你的六月考运`
+  try {
+    const result = await configureWechatShare({
+      apiClient: props.apiClient ?? activityApi,
+      title: shareTitle,
+      desc: RESULT_WECHAT_SHARE_DESC,
+      timelineTitle: shareTitle,
+      link: shareResult.share_url,
+      imgUrl: shareAsset('share_activity_poster.webp'),
+      onShareSuccess: (target) => {
+        trackEvent('wechat_share_success', {
+          share_target: target,
+          share_token: shareResult.share_token,
+        })
+      },
+    })
+    trackEvent(result.configured ? 'wechat_share_config_success' : 'wechat_share_config_skip', {
+      share_token: shareResult.share_token,
+      reason: result.reason,
+    })
+  } catch (error) {
+    trackEvent('wechat_share_config_fail', {
+      share_token: shareResult.share_token,
+      message: error instanceof Error ? error.message : 'wechat share config failed',
+    })
   }
 }
 const loadPosterCanvasImage = (src) =>
@@ -780,13 +881,16 @@ const prepareP2SharePosterPreview = () =>
   )
 const completeShareForPoster = async (shareChannel) => {
   const result = await completeShare(shareChannel)
-  return updateSharePosterQrcode(result)
+  return {
+    result,
+    hasTrackedQrcode: await updateSharePosterQrcode(result),
+  }
 }
 const openHomeSharePoster = () => {
   resetSharePosterQrcode()
   ensureActivitySharePosterSrc()
   openShareGuide()
-  void completeShareForPoster('home_share').then((hasTrackedQrcode) => {
+  void completeShareForPoster('home_share').then(({ hasTrackedQrcode }) => {
     if (hasTrackedQrcode && showShareGuide.value) {
       sharePosterPreviewSrc.value = ''
       prepareHomeSharePosterPreview()
@@ -795,13 +899,14 @@ const openHomeSharePoster = () => {
 }
 const openResultSharePoster = () => {
   resetSharePosterQrcode()
-  ensureActivitySharePosterSrc()
+  p2PosterPreviewSrc.value = ''
+  pickResultShareMascot()
   openP2Poster()
-  void completeShareForPoster('result_share').then((hasTrackedQrcode) => {
+  void completeShareForPoster('result_share').then(({ result, hasTrackedQrcode }) => {
     if (hasTrackedQrcode && p2Panel.value === 'poster') {
       p2PosterPreviewSrc.value = ''
-      prepareP2SharePosterPreview()
     }
+    void configureResultWechatShare(result)
   })
 }
 const saveActivityPoster = async ({ posterType, setMessage, setPreview, shareChannel = 'poster_save' }) => {
@@ -965,7 +1070,9 @@ watch(p2Panel, (panel) => {
     return
   }
 
-  prepareP2SharePosterPreview()
+  p2PosterSaveMessage.value = ''
+  p2PosterPreviewSrc.value = ''
+  void scheduleResultShareMascotSpacing()
 })
 
 watch(currentPage, () => {
@@ -991,6 +1098,12 @@ watch(p2Panel, () => {
   p2PosterPreviewSrc.value = ''
 })
 
+watch([p2FortuneHintLines, hasResultShareAiExplain], () => {
+  if (p2Panel.value === 'poster') {
+    void scheduleResultShareMascotSpacing()
+  }
+})
+
 watch(p4Detail, () => {
   p4ProductImageFailed.value = false
 })
@@ -1014,6 +1127,9 @@ onMounted(async () => {
     report: (eventName, payload) => trackEvent(eventName, payload),
   })
   void releaseFirstScreen()
+  if (typeof window !== 'undefined') {
+    window.addEventListener('resize', updateResultShareMascotSpacing)
+  }
   await nextTick()
   runtimeMonitor?.checkPageNodes()
 })
@@ -1027,6 +1143,9 @@ watch(currentPage, async () => {
 })
 
 onBeforeUnmount(() => {
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('resize', updateResultShareMascotSpacing)
+  }
   runtimeMonitor?.dispose()
   runtimeMonitor = undefined
 })
@@ -1340,28 +1459,122 @@ onBeforeUnmount(() => {
         >
           <span class="sr-only">关闭</span>
         </button>
-        <article v-if="!p2PosterPreviewSrc" class="p2-poster-card" data-testid="p2-poster-card">
-          <img
-            class="activity-share-poster-image"
-            data-testid="p2-share-activity-poster"
-            :src="activitySharePosterSrc"
-            alt="高考抽签专属福利活动页"
-            loading="lazy"
-            decoding="async"
-          />
-          <span class="activity-share-poster-qrcode">
+        <article
+          v-if="!p2PosterPreviewSrc"
+          class="p2-poster-card result-share-card"
+          data-testid="result-share-card"
+        >
+          <div
+            ref="resultSharePosterSurfaceRef"
+            class="p2-combined-card result-share-poster-surface"
+            :class="{ 'is-ai-share': hasResultShareAiExplain }"
+            data-testid="result-share-poster-surface"
+            :style="resultSharePosterSpacingStyle"
+          >
             <img
-              v-if="activityPosterQrcodeSrc"
-              data-testid="p2-poster-qrcode"
-              :src="activityPosterQrcodeSrc"
-              alt="活动二维码"
-              :data-share-url="sharePosterUrl"
+              class="result-share-brand-logo"
+              data-testid="result-share-brand-logo"
+              :src="homeImageAsset('logo_prime_cuts_home.png')"
+              alt="Prime Cuts 璞莱牧"
               loading="lazy"
               decoding="async"
-              @error="handleActivityPosterQrcodeError"
             />
-            <span v-else>二维码暂未配置</span>
-          </span>
+            <section
+              class="p2-fortune-copy result-share-fortune-copy"
+              data-testid="result-share-fortune-copy"
+              aria-label="分享签文"
+            >
+              <h2 data-testid="result-share-sign-title">{{ p2FortuneHeadline }}</h2>
+              <p
+                ref="resultShareSignContentRef"
+                class="p2-fortune-hint result-share-sign-content"
+                data-testid="result-share-sign-content"
+              >
+                <span
+                  v-for="line in p2FortuneHintLines"
+                  :key="`share-${line.id}`"
+                  class="p2-fortune-line"
+                >
+                  <span
+                    v-for="(segment, index) in line.segments"
+                    :key="`share-${line.id}-${index}-${segment.text}`"
+                    :class="{ 'p2-fortune-emphasis': segment.highlight }"
+                  >
+                    {{ segment.text }}
+                  </span>
+                </span>
+              </p>
+            </section>
+
+            <section
+              v-if="hasResultShareAiExplain"
+              class="p2-ai-panel result-share-ai-panel"
+              data-testid="result-share-ai-explain"
+              aria-label="AI 解签内容"
+            >
+              <div class="p2-ai-scroll result-share-ai-scroll is-open" data-testid="result-share-ai-scroll">
+                <div class="p2-scroll-head result-share-scroll-head" aria-hidden="true">
+                  <img
+                    :src="p4ImageAsset('text_ai_result_scroll_header_double_tassel.png')"
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </div>
+                <div class="p2-scroll-body">
+                  <div class="p2-ai-result">
+                    <p v-for="line in p4Detail.explainLines.slice(0, 4)" :key="line">{{ line }}</p>
+                  </div>
+                </div>
+              </div>
+            </section>
+            <img
+              v-else
+              class="result-share-scroll-mascot"
+              data-testid="result-share-scroll-mascot"
+              :src="resultShareMascot.src"
+              :alt="resultShareMascot.alt"
+              loading="lazy"
+              decoding="async"
+            />
+
+            <div ref="resultShareFooterQrcodeRef" class="result-share-footer-qrcode">
+              <img
+                v-if="p7QrcodeSrc"
+                data-testid="result-share-wecom-qrcode"
+                :src="p7QrcodeSrc"
+                alt="企微二维码"
+                loading="lazy"
+                decoding="async"
+                @error="handleP7QrcodeError"
+              />
+              <span v-else>二维码暂未配置</span>
+            </div>
+            <img
+              v-if="hasResultShareAiExplain"
+              class="result-share-footer-mascot"
+              data-testid="result-share-footer-mascot"
+              :src="resultShareMascot.src"
+              :alt="resultShareMascot.alt"
+              loading="lazy"
+              decoding="async"
+            />
+            <div
+              v-if="hasResultShareAiExplain"
+              class="result-share-footer-mascot-decor"
+              data-testid="result-share-footer-mascot-decor"
+              aria-hidden="true"
+            >
+              <img
+                class="result-share-footer-goodluck-icon"
+                data-testid="result-share-footer-goodluck-icon"
+                :src="p4ImageAsset('element_good_luck_0842.png')"
+                alt=""
+                loading="lazy"
+                decoding="async"
+              />
+            </div>
+          </div>
         </article>
         <img
           v-else
@@ -1802,29 +2015,8 @@ onBeforeUnmount(() => {
     aria-label="抽签动画"
   >
     <section class="draw-animation-shell" role="status" aria-live="polite">
-      <video
-        v-if="canUseTransparentDrawVideo"
-        class="draw-animation-video"
-        data-testid="draw-animation-video"
-        autoplay
-        muted
-        playsinline
-        webkit-playsinline
-        preload="metadata"
-        @canplay="playDrawAnimation"
-        @ended="completeDrawAnimation"
-        @error="failDrawAnimation"
-      >
-        <source
-          v-if="drawAnimationVideoSrc"
-          data-testid="draw-animation-webm-source"
-          :src="drawAnimationVideoSrc"
-          type="video/webm"
-        >
-      </video>
       <img
-        v-else
-        class="draw-animation-video draw-animation-fallback"
+        class="draw-animation-visual draw-animation-fallback"
         data-testid="draw-animation-fallback"
         :src="homeImageAsset('element_lottery_box.png')"
         alt=""

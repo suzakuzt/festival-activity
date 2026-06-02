@@ -110,6 +110,7 @@ export const activityApi = {
   getClaimResult: ({ session_token, claim_no }) =>
     request('/api/benefit/claim/result', { params: { session_token, claim_no } }),
   recordShare: (body) => request('/api/share/record', { method: 'POST', body }),
+  getWechatJssdkSignature: (body) => request('/api/wechat/jssdk-signature', { method: 'POST', body }),
   getRewardCenter: ({ session_token }) => request('/api/reward/center/detail', { params: { session_token } }),
   getGrandPrizeDetail: ({ session_token }) =>
     request('/api/grand-prize/qualification/detail', { params: { session_token } }),

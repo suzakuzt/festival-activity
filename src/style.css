@@ -1,6 +1,8 @@
 :root {
   --h5-stage-width: min(100%, 430px);
+  --h5-stage-height: min(177.7778vw, 764.4445px);
   --h5-stage-ratio: 1242 / 2208;
+  --p2-result-stage-height: min(177.6833vw, 764.0383px);
   --theme-primary: #b80606;
   --gold: #f4d487;
   --gold-deep: #c99b4d;
@@ -45,6 +47,7 @@ button {
 }
 
 #app {
+  min-height: 100vh;
   min-height: 100svh;
   background: #230201;
 }
@@ -111,6 +114,7 @@ button {
 }
 
 .home-page {
+  min-height: 100vh;
   min-height: 100svh;
   display: flex;
   align-items: flex-start;
@@ -138,7 +142,11 @@ button {
 
 .home-stage {
   position: relative;
+  width: 100%;
   width: var(--h5-stage-width);
+  height: 177.7778vw;
+  max-height: 764.4445px;
+  height: var(--h5-stage-height);
   aspect-ratio: var(--h5-stage-ratio);
   overflow: hidden;
   padding: 35px 22px 24px;
@@ -345,14 +353,19 @@ button {
 
 .draw-animation-shell {
   position: relative;
+  width: 100%;
   width: var(--h5-stage-width);
+  height: 177.7778vw;
+  max-height: 764.4445px;
+  height: var(--h5-stage-height);
   aspect-ratio: var(--h5-stage-ratio);
+  max-height: 100vh;
   max-height: 100svh;
   overflow: hidden;
   pointer-events: none;
 }
 
-.draw-animation-video {
+.draw-animation-visual {
   position: absolute;
   top: 26.5%;
   left: 50%;
@@ -628,6 +641,7 @@ button {
 }
 
 .placeholder-page {
+  min-height: 100vh;
   min-height: 100svh;
   display: grid;
   place-content: center;
@@ -651,6 +665,7 @@ button {
 }
 
 .p2-page {
+  min-height: 100vh;
   min-height: 100svh;
   display: flex;
   align-items: flex-start;
@@ -662,7 +677,11 @@ button {
 
 .p2-stage {
   position: relative;
+  width: 100%;
   width: var(--h5-stage-width);
+  height: 177.7778vw;
+  max-height: 764.4445px;
+  height: var(--h5-stage-height);
   aspect-ratio: var(--h5-stage-ratio);
   overflow: hidden;
   text-align: center;
@@ -915,6 +934,7 @@ button {
 }
 
 .p4-page {
+  min-height: 100vh;
   min-height: 100svh;
   display: flex;
   align-items: flex-start;
@@ -926,7 +946,11 @@ button {
 
 .p4-stage {
   position: relative;
+  width: 100%;
   width: var(--h5-stage-width);
+  height: 177.7778vw;
+  max-height: 764.4445px;
+  height: var(--h5-stage-height);
   aspect-ratio: var(--h5-stage-ratio);
   overflow: hidden;
   text-align: center;
@@ -1264,6 +1288,7 @@ button {
 }
 
 .p2-page {
+  min-height: 100vh;
   min-height: 100svh;
   display: flex;
   align-items: flex-start;
@@ -1275,7 +1300,9 @@ button {
 
 .p2-stage {
   position: relative;
+  width: 100%;
   width: var(--h5-stage-width);
+  min-height: calc(100vh - var(--safe-top) - var(--safe-bottom));
   min-height: calc(100svh - var(--safe-top) - var(--safe-bottom));
   aspect-ratio: auto;
   overflow-x: hidden;
@@ -1528,6 +1555,7 @@ button {
 
 /* P2/P4 now share one result surface composed from the P4-1 design assets. */
 .p2-page {
+  min-height: 100vh;
   min-height: 100svh;
   display: flex;
   align-items: flex-start;
@@ -1541,6 +1569,9 @@ button {
   position: relative;
   width: min(100vw, 430px);
   max-width: 100%;
+  height: 177.6833vw;
+  max-height: 764.0383px;
+  height: var(--p2-result-stage-height);
   min-height: auto;
   aspect-ratio: 941 / 1672;
   overflow: hidden;
@@ -2209,6 +2240,171 @@ button {
   text-align: center;
 }
 
+.result-share-card {
+  display: block;
+  width: min(100%, calc((100vh - 118px - var(--safe-top) - var(--safe-bottom)) * 941 / 1672));
+  aspect-ratio: 941 / 1672;
+  padding: 0;
+  border: 0;
+  background: #fff0cd;
+  color: #5e2118;
+}
+
+@supports (height: 100svh) {
+  .result-share-card {
+    width: min(100%, calc((100svh - 118px - var(--safe-top) - var(--safe-bottom)) * 941 / 1672));
+  }
+}
+
+.result-share-poster-surface {
+  pointer-events: none;
+  background-image: var(--result-share-poster-bg, url("/assets/p4/bg_result_share_no_ai.webp"));
+  background-position: center top;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+}
+
+.result-share-brand-logo {
+  position: absolute;
+  z-index: 4;
+  top: 4.2%;
+  left: 10.8%;
+  width: 22%;
+  height: auto;
+  display: block;
+  object-fit: contain;
+  filter:
+    drop-shadow(0 1px 1px rgba(104, 19, 10, 0.72))
+    drop-shadow(0 0 2px rgba(104, 19, 10, 0.48));
+  pointer-events: none;
+}
+
+.result-share-fortune-copy {
+  top: 10.2%;
+}
+
+.result-share-fortune-copy h2 {
+  min-height: 46px;
+  transform: translateY(-18px);
+}
+
+.result-share-sign-content {
+  max-height: 18%;
+  overflow: hidden;
+}
+
+.result-share-poster-surface.is-ai-share .result-share-sign-content {
+  font-size: clamp(20px, 5.7vw, 27px);
+  line-height: 1.16;
+}
+
+.result-share-ai-panel {
+  top: var(--result-share-ai-top, 47%);
+  pointer-events: none;
+}
+
+.result-share-ai-scroll .p2-scroll-head {
+  cursor: default;
+}
+
+.result-share-ai-scroll .p2-scroll-body {
+  transition: none;
+}
+
+.result-share-ai-scroll.is-open .p2-scroll-body {
+  min-height: var(--result-share-ai-body-height, 168px);
+  max-height: var(--result-share-ai-body-height, 168px);
+  padding: 30px 24px 32px;
+}
+
+.result-share-ai-scroll .p2-ai-result {
+  max-height: calc(var(--result-share-ai-body-height, 168px) - 64px);
+}
+
+.result-share-ai-scroll .p2-ai-result p {
+  font-size: clamp(12.5px, 3vw, 14px);
+  line-height: 1.45;
+}
+
+.result-share-scroll-mascot {
+  position: absolute;
+  z-index: 3;
+  top: var(--result-share-mascot-top, 47%);
+  left: 50%;
+  width: 44%;
+  height: 20%;
+  display: block;
+  object-fit: contain;
+  object-position: center bottom;
+  transform: translateX(-50%);
+  filter: drop-shadow(0 14px 13px rgba(82, 5, 0, 0.18));
+}
+
+.result-share-footer-qrcode {
+  position: absolute;
+  z-index: 5;
+  top: 83.8%;
+  left: 25.8%;
+  width: 24.5%;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  padding: 1.4%;
+  border-radius: 6px;
+  color: #8b2012;
+  background: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: center;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 4px 10px rgba(84, 22, 0, 0.12);
+}
+
+.result-share-footer-qrcode img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.result-share-footer-qrcode span {
+  display: block;
+}
+
+.result-share-footer-mascot {
+  position: absolute;
+  z-index: 5;
+  top: 84%;
+  left: 58.5%;
+  width: 31%;
+  height: 17%;
+  display: block;
+  object-fit: contain;
+  object-position: center;
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 10px 10px rgba(82, 5, 0, 0.18));
+}
+
+.result-share-footer-mascot-decor {
+  position: absolute;
+  z-index: 6;
+  top: 76.6%;
+  left: 72.8%;
+  width: 13.2%;
+  height: 15%;
+  pointer-events: none;
+}
+
+.result-share-footer-goodluck-icon {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  filter: drop-shadow(0 5px 6px rgba(105, 13, 0, 0.16));
+}
+
 .p2-poster-dismiss:active,
 .p2-poster-save:active {
   transform: translateY(1px) scale(0.98);
@@ -2476,6 +2672,8 @@ button {
 }
 
 .p8-page {
+  height: 100vh;
+  min-height: 100vh;
   height: 100svh;
   min-height: 100svh;
   display: flex;
@@ -2492,7 +2690,11 @@ button {
 .p8-stage {
   position: relative;
   flex: 0 0 auto;
+  width: 100%;
   width: var(--h5-stage-width);
+  height: 177.7778vw;
+  max-height: 764.4445px;
+  height: var(--h5-stage-height);
   aspect-ratio: var(--h5-stage-ratio);
   overflow: hidden;
   text-align: center;
@@ -2733,6 +2935,8 @@ button {
 }
 
 .p7-page {
+  height: 100vh;
+  min-height: 100vh;
   height: 100svh;
   min-height: 100svh;
   display: flex;
@@ -2749,7 +2953,11 @@ button {
 .p7-stage {
   position: relative;
   flex: 0 0 auto;
+  width: 100%;
   width: var(--h5-stage-width);
+  height: 177.7778vw;
+  max-height: 764.4445px;
+  height: var(--h5-stage-height);
   aspect-ratio: var(--h5-stage-ratio);
   overflow: hidden;
   text-align: center;
@@ -2962,6 +3170,8 @@ button {
 }
 
 .p6-page {
+  height: 100vh;
+  min-height: 100vh;
   height: 100svh;
   min-height: 100svh;
   display: flex;
@@ -2980,7 +3190,11 @@ button {
 .p6-stage {
   position: relative;
   flex: 0 0 auto;
+  width: 100%;
   width: var(--h5-stage-width);
+  height: 177.7778vw;
+  max-height: 764.4445px;
+  height: var(--h5-stage-height);
   aspect-ratio: var(--h5-stage-ratio);
   overflow: hidden;
   text-align: center;
@@ -3528,18 +3742,27 @@ button {
 @media (max-height: 720px) {
   .p2-stage {
     width: min(100vw, 405px);
+    height: 177.6833vw;
+    max-height: 719.6175px;
+    height: min(177.6833vw, 719.6175px);
   }
 }
 
 @media (max-height: 680px) {
   .p2-stage {
     width: min(100vw, 382px);
+    height: 177.6833vw;
+    max-height: 678.7503px;
+    height: min(177.6833vw, 678.7503px);
   }
 }
 
 @media (max-height: 640px) {
   .p2-stage {
     width: min(100vw, 360px);
+    height: 177.6833vw;
+    max-height: 639.66px;
+    height: min(177.6833vw, 639.66px);
   }
 
   .bottom-nav button,
