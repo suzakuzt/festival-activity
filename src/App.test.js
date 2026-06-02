@@ -548,9 +548,21 @@ describe('P1 activity home', () => {
     expect(wrapper.text()).not.toContain('压力自动降噪')
   })
 
-  it('opens the result share popup as the reused fortune poster with WeCom QR and a random mascot before AI explanation', async () => {
+  it('opens the result share popup as the reused fortune poster with the activity QR and a random mascot before AI explanation', async () => {
     const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.4)
+    const createSession = vi.fn().mockResolvedValue({ session_token: 'sess_result_popup' })
+    const recordShare = vi.fn().mockResolvedValue({
+      success: true,
+      share_token: 'SHARE_TOKEN',
+      share_url: '/activity/home?share_token=SHARE_TOKEN',
+      reward_granted: false,
+      daily_state: {
+        remaining_draw_count: 1,
+        share_reward_count_today: 0,
+      },
+    })
     const wrapper = mountResult({
+      apiClient: { createSession, recordShare, trackEvent: vi.fn().mockResolvedValue({}) },
       initialP2Result: {
         signType: 'SIGN_TITLE',
         signLevel: 'TOP_LEVEL',
@@ -564,6 +576,7 @@ describe('P1 activity home', () => {
     })
 
     await wrapper.get('[data-testid="share-poster"]').trigger('click')
+    await flushPromises()
 
     const poster = wrapper.get('[data-testid="p2-poster-dialog"]')
     expect(poster.get('[data-testid="result-share-card"]').classes()).toContain('result-share-card')
@@ -583,8 +596,8 @@ describe('P1 activity home', () => {
       'share_mascot_zhuangyuan.webp',
     )
     expect(poster.find('[data-testid="result-share-ai-explain"]').exists()).toBe(false)
-    expect(poster.get('[data-testid="result-share-wecom-qrcode"]').attributes('src')).toContain(
-      'qrcode_wechat_group.png',
+    expect(decodeURIComponent(poster.get('[data-testid="result-share-activity-qrcode"]').attributes('src'))).toContain(
+      '/activity/home?share_token=SHARE_TOKEN',
     )
     expect(poster.find('[data-testid="result-share-gift-title"]').exists()).toBe(false)
     expect(poster.find('[data-testid="result-share-footer-mascot"]').exists()).toBe(false)
@@ -799,8 +812,8 @@ describe('P1 activity home', () => {
     expect(recordShare).toHaveBeenCalledWith({ session_token: 'sess_result_share', share_channel: 'result_share' })
     expect(wrapper.get('[data-testid="p2-poster-dialog"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="p2-poster-qrcode"]').exists()).toBe(false)
-    expect(wrapper.get('[data-testid="result-share-wecom-qrcode"]').attributes('src')).toContain(
-      'qrcode_wechat_group.png',
+    expect(decodeURIComponent(wrapper.get('[data-testid="result-share-activity-qrcode"]').attributes('src'))).toContain(
+      '/activity/home?share_token=SH_RESULT_TEST',
     )
   })
 

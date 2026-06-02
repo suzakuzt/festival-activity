@@ -1540,13 +1540,14 @@ onBeforeUnmount(() => {
 
             <div ref="resultShareFooterQrcodeRef" class="result-share-footer-qrcode">
               <img
-                v-if="p7QrcodeSrc"
-                data-testid="result-share-wecom-qrcode"
-                :src="p7QrcodeSrc"
-                alt="企微二维码"
+                v-if="activityPosterQrcodeSrc"
+                data-testid="result-share-activity-qrcode"
+                :src="activityPosterQrcodeSrc"
+                alt="活动二维码"
                 loading="lazy"
                 decoding="async"
-                @error="handleP7QrcodeError"
+                :data-share-url="sharePosterUrl"
+                @error="handleActivityPosterQrcodeError"
               />
               <span v-else>二维码暂未配置</span>
             </div>
