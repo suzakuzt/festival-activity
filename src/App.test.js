@@ -1172,6 +1172,7 @@ describe('P1 activity home', () => {
       /\.result-share-scroll-mascot\s*{[^}]*top:\s*var\(--result-share-mascot-top,\s*47%\);[^}]*width:\s*44%;[^}]*height:\s*20%;[^}]*object-fit:\s*contain;/s,
     )
     expect(css).toMatch(/\.result-share-ai-panel\s*{[^}]*top:\s*var\(--result-share-ai-top,\s*47%\);/s)
+    expect(css).toMatch(/\.result-share-ai-scroll \.p2-scroll-body\s*{[^}]*margin:\s*-10\.5%\s*auto\s*0;/s)
     expect(css).toMatch(
       /\.result-share-ai-scroll\.is-open \.p2-scroll-body\s*{[^}]*min-height:\s*var\(--result-share-ai-body-height,\s*168px\);/s,
     )

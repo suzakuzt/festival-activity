@@ -2308,6 +2308,7 @@ button {
 }
 
 .result-share-ai-scroll .p2-scroll-body {
+  margin: -10.5% auto 0;
   transition: none;
 }
 

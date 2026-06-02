@@ -960,7 +960,7 @@ const drawResultShareAiPanel = async (ctx, width, height) => {
   const bodyWidth = panelWidth * 0.94
   const bodyHeight = Math.max(resultShareAiBodyHeightPx.value * scale, height * 0.12)
   const bodyX = panelX + (panelWidth - bodyWidth) / 2
-  const bodyY = panelTop + headHeight - panelWidth * 0.165
+  const bodyY = panelTop + headHeight - panelWidth * 0.105
 
   ctx.save()
   ctx.shadowColor = 'rgba(83, 5, 0, 0.18)'
