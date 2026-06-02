@@ -2299,8 +2299,8 @@ button {
 }
 
 .result-share-poster-surface.is-ai-share .result-share-sign-content {
-  font-size: clamp(25px, 7.2vw, 34px);
-  line-height: 1.18;
+  font-size: clamp(26px, 7.6vw, 36px);
+  line-height: 1.16;
 }
 
 .result-share-ai-panel {
@@ -2320,11 +2320,11 @@ button {
 .result-share-ai-scroll.is-open .p2-scroll-body {
   min-height: var(--result-share-ai-body-height, 168px);
   max-height: var(--result-share-ai-body-height, 168px);
-  padding: 30px 24px 32px;
+  padding: 24px 24px 30px;
 }
 
 .result-share-ai-scroll .p2-ai-result {
-  max-height: calc(var(--result-share-ai-body-height, 168px) - 64px);
+  max-height: calc(var(--result-share-ai-body-height, 168px) - 54px);
 }
 
 .result-share-ai-scroll .p2-ai-result p {

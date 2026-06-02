@@ -397,10 +397,13 @@ const updateResultShareMascotSpacing = () => {
       surfaceHeight: surfaceRect.height,
       signContentBottom: signContentRect.bottom,
       footerTop: footerRect?.top,
-      minimumFooterGapPx: 34,
+      minimumSignGapPx: -26,
+      minimumFooterGapPx: 46,
       bodyTopOffsetPx,
-      minBodyHeightPx: 126,
-      maxBodyHeightPx: 150,
+      minTopPercent: 34,
+      maxTopPercent: 46,
+      minBodyHeightPx: 138,
+      maxBodyHeightPx: 146,
     })
     resultShareMascotTopPercent.value = 47
     resultShareAiTopPercent.value = Number(layout.topPercent.toFixed(2))
@@ -980,7 +983,7 @@ const getResultSharePosterScale = () => {
 const drawResultShareTitle = (ctx, width, height, hasAiExplain) => {
   ctx.save()
   ctx.fillStyle = '#542414'
-  ctx.font = `900 ${hasAiExplain ? 58 : 56}px STXingkai, KaiTi, STKaiti, serif`
+  ctx.font = `900 ${hasAiExplain ? 60 : 56}px STXingkai, KaiTi, STKaiti, serif`
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
   ctx.shadowColor = 'rgba(76, 17, 4, 0.16)'
@@ -991,8 +994,8 @@ const drawResultShareTitle = (ctx, width, height, hasAiExplain) => {
 }
 const drawResultShareFortune = (ctx, width, height, hasAiExplain) => {
   drawSegmentedPosterLines(ctx, p2FortuneHintLines.value, width / 2, height * (hasAiExplain ? 0.162 : 0.164), {
-    font: `800 ${hasAiExplain ? 72 : 58}px KaiTi, STKaiti, serif`,
-    lineHeight: hasAiExplain ? 92 : 78,
+    font: `800 ${hasAiExplain ? 78 : 58}px KaiTi, STKaiti, serif`,
+    lineHeight: hasAiExplain ? 96 : 78,
     maxWidth: width * 0.76,
   })
 }
@@ -1044,7 +1047,7 @@ const drawResultShareAiPanel = async (ctx, width, height) => {
   const headHeight = headWidth * (Number(scrollHead.naturalHeight || scrollHead.height) / Number(scrollHead.naturalWidth || scrollHead.width))
   const headX = panelX + (panelWidth - headWidth) / 2
   const bodyWidth = panelWidth * 0.94
-  const bodyHeight = Math.max(resultShareAiBodyHeightPx.value * scale, height * 0.12)
+  const bodyHeight = Math.max(resultShareAiBodyHeightPx.value * scale, height * 0.1)
   const bodyX = panelX + (panelWidth - bodyWidth) / 2
   const bodyY = panelTop + headHeight - panelWidth * 0.105
 
@@ -1056,7 +1059,7 @@ const drawResultShareAiPanel = async (ctx, width, height) => {
   ctx.restore()
   ctx.drawImage(body, bodyX, bodyY, bodyWidth, bodyHeight)
 
-  const textTop = bodyY + 30 * scale
+  const textTop = bodyY + 24 * scale
   const lines = p4Detail.value.explainLines.slice(0, 4)
   ctx.save()
   ctx.fillStyle = '#6b2a18'
@@ -1064,7 +1067,7 @@ const drawResultShareAiPanel = async (ctx, width, height) => {
   ctx.textAlign = 'center'
   ctx.textBaseline = 'top'
   lines.flatMap((line) => wrapPosterText(ctx, line, bodyWidth - 48 * scale)).slice(0, 6).forEach((line, index) => {
-    ctx.fillText(line, width / 2, textTop + index * 22 * scale, bodyWidth - 48 * scale)
+    ctx.fillText(line, width / 2, textTop + index * 20 * scale, bodyWidth - 48 * scale)
   })
   ctx.restore()
 }

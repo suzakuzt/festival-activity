@@ -637,11 +637,11 @@ describe('P1 activity home', () => {
     const source = readFileSync('src/App.vue', 'utf-8')
 
     expect(css).toMatch(
-      /\.result-share-poster-surface\.is-ai-share \.result-share-sign-content\s*{[^}]*font-size:\s*clamp\(25px,\s*7\.2vw,\s*34px\);[^}]*line-height:\s*1\.18;/s,
+      /\.result-share-poster-surface\.is-ai-share \.result-share-sign-content\s*{[^}]*font-size:\s*clamp\(26px,\s*7\.6vw,\s*36px\);[^}]*line-height:\s*1\.16;/s,
     )
-    expect(source).toMatch(/ctx\.font = `900 \$\{hasAiExplain \? 58 : 56\}px STXingkai, KaiTi, STKaiti, serif`/)
-    expect(source).toMatch(/font:\s*`800 \$\{hasAiExplain \? 72 : 58\}px KaiTi, STKaiti, serif`/)
-    expect(source).toMatch(/lineHeight:\s*hasAiExplain \? 92 : 78/)
+    expect(source).toMatch(/ctx\.font = `900 \$\{hasAiExplain \? 60 : 56\}px STXingkai, KaiTi, STKaiti, serif`/)
+    expect(source).toMatch(/font:\s*`800 \$\{hasAiExplain \? 78 : 58\}px KaiTi, STKaiti, serif`/)
+    expect(source).toMatch(/lineHeight:\s*hasAiExplain \? 96 : 78/)
   })
 
   it('places the result share mascot below dynamic sign content with a minimum gap', () => {
@@ -682,6 +682,27 @@ describe('P1 activity home', () => {
 
     expect(layout.topPercent).toBeCloseTo(43.2, 1)
     expect(layout.bodyHeightPx).toBeGreaterThan(160)
+  })
+
+  it('moves the result share AI scroll upward while keeping footer breathing room', () => {
+    const layout = calculateResultShareAiLayout({
+      surfaceTop: 0,
+      surfaceHeight: 530,
+      signContentBottom: 208,
+      footerTop: 380,
+      minimumSignGapPx: -26,
+      minimumFooterGapPx: 46,
+      panelChromePx: 8,
+      bodyTopOffsetPx: 40,
+      minTopPercent: 34,
+      maxTopPercent: 46,
+      minBodyHeightPx: 138,
+      maxBodyHeightPx: 146,
+    })
+
+    expect(layout.topPercent).toBeCloseTo(34.3, 1)
+    expect(layout.bodyHeightPx).toBeGreaterThanOrEqual(138)
+    expect(layout.bodyHeightPx).toBeLessThanOrEqual(146)
   })
 
   it('shows AI explanation with the reused scroll and without the replacement mascot after AI has opened', async () => {
