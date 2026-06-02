@@ -397,8 +397,10 @@ const updateResultShareMascotSpacing = () => {
       surfaceHeight: surfaceRect.height,
       signContentBottom: signContentRect.bottom,
       footerTop: footerRect?.top,
-      minimumFooterGapPx: 28,
+      minimumFooterGapPx: 34,
       bodyTopOffsetPx,
+      minBodyHeightPx: 126,
+      maxBodyHeightPx: 150,
     })
     resultShareMascotTopPercent.value = 47
     resultShareAiTopPercent.value = Number(layout.topPercent.toFixed(2))
@@ -976,7 +978,7 @@ const getResultSharePosterScale = () => {
 const drawResultShareTitle = (ctx, width, height, hasAiExplain) => {
   ctx.save()
   ctx.fillStyle = '#542414'
-  ctx.font = `900 ${hasAiExplain ? 50 : 56}px STXingkai, KaiTi, STKaiti, serif`
+  ctx.font = `900 ${hasAiExplain ? 58 : 56}px STXingkai, KaiTi, STKaiti, serif`
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
   ctx.shadowColor = 'rgba(76, 17, 4, 0.16)'
@@ -987,8 +989,8 @@ const drawResultShareTitle = (ctx, width, height, hasAiExplain) => {
 }
 const drawResultShareFortune = (ctx, width, height, hasAiExplain) => {
   drawSegmentedPosterLines(ctx, p2FortuneHintLines.value, width / 2, height * (hasAiExplain ? 0.162 : 0.164), {
-    font: `800 ${hasAiExplain ? 50 : 58}px KaiTi, STKaiti, serif`,
-    lineHeight: hasAiExplain ? 66 : 78,
+    font: `800 ${hasAiExplain ? 72 : 58}px KaiTi, STKaiti, serif`,
+    lineHeight: hasAiExplain ? 92 : 78,
     maxWidth: width * 0.76,
   })
 }

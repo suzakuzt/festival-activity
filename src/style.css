@@ -2294,8 +2294,8 @@ button {
 }
 
 .result-share-poster-surface.is-ai-share .result-share-sign-content {
-  font-size: clamp(20px, 5.7vw, 27px);
-  line-height: 1.16;
+  font-size: clamp(25px, 7.2vw, 34px);
+  line-height: 1.18;
 }
 
 .result-share-ai-panel {

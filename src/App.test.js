@@ -623,6 +623,18 @@ describe('P1 activity home', () => {
     expect(css).toContain('translateY(-18px)')
   })
 
+  it('keeps AI result share sign copy proportional to the main result typography', () => {
+    const css = readFileSync('src/style.css', 'utf-8')
+    const source = readFileSync('src/App.vue', 'utf-8')
+
+    expect(css).toMatch(
+      /\.result-share-poster-surface\.is-ai-share \.result-share-sign-content\s*{[^}]*font-size:\s*clamp\(25px,\s*7\.2vw,\s*34px\);[^}]*line-height:\s*1\.18;/s,
+    )
+    expect(source).toMatch(/ctx\.font = `900 \$\{hasAiExplain \? 58 : 56\}px STXingkai, KaiTi, STKaiti, serif`/)
+    expect(source).toMatch(/font:\s*`800 \$\{hasAiExplain \? 72 : 58\}px KaiTi, STKaiti, serif`/)
+    expect(source).toMatch(/lineHeight:\s*hasAiExplain \? 92 : 78/)
+  })
+
   it('places the result share mascot below dynamic sign content with a minimum gap', () => {
     const topPercent = calculateResultShareMascotTopPercent({
       surfaceTop: 24,
@@ -659,7 +671,7 @@ describe('P1 activity home', () => {
       footerTop: 476,
     })
 
-    expect(layout.topPercent).toBe(44)
+    expect(layout.topPercent).toBeCloseTo(43.2, 1)
     expect(layout.bodyHeightPx).toBeGreaterThan(160)
   })
 
