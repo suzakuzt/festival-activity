@@ -740,9 +740,9 @@ const POSTER_LONGPRESS_TIP = '长按海报可保存/分享'
 const POSTER_SAVE_SUCCESS_MESSAGE = '保存成功，手机端请长按上方图片保存到相册'
 const POSTER_GENERATED_MESSAGE = '海报已生成，手机端请长按上方图片保存到相册'
 const MINI_PROGRAM_POSTER_SAVE_MESSAGE = '正在打开小程序保存到相册...'
-const RESULT_WECHAT_SHARE_DESC = 'PrimeCuts 璞莱牧高考考运签，抽签还能领好礼'
-const DEFAULT_WECHAT_SHARE_TITLE = '一举高中 · 六月牛气加油签'
-const DEFAULT_WECHAT_TIMELINE_SHARE_TITLE = '一举高中 · 六月牛气加油签，抽你的六月考运'
+const RESULT_WECHAT_SHARE_DESC = '测六月考运，抽签即领优惠券福利'
+const DEFAULT_WECHAT_SHARE_TITLE = '高考抽签专属福利｜Prime Cuts 璞莱牧'
+const DEFAULT_WECHAT_TIMELINE_SHARE_TITLE = '高考抽签专属福利，抽签即领优惠券福利'
 const WECHAT_SHARE_CARD_IMAGE = shareAsset('share_card_cover.jpg')
 const toAbsolutePosterUrl = (posterUrl) => {
   if (!posterUrl) {

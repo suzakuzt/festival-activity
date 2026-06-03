@@ -102,7 +102,8 @@ describe('P1 activity home', () => {
   it('uses the activity name as the browser title fallback for WeChat timeline sharing', () => {
     const html = readSource('index.html')
 
-    expect(html).toContain('<title>一举高中 · 六月牛气加油签</title>')
+    expect(html).toContain('<title>高考抽签专属福利｜Prime Cuts 璞莱牧</title>')
+    expect(html).toContain('content="测六月考运，抽签即领优惠券福利"')
     expect(html).not.toContain('<title>festival-activity</title>')
   })
 
@@ -145,15 +146,15 @@ describe('P1 activity home', () => {
 
     expect(updateTimelineShareData).toHaveBeenCalledWith(
       expect.objectContaining({
-        title: expect.stringContaining('六月牛气加油签'),
+        title: expect.stringContaining('高考抽签专属福利'),
         link: 'http://localhost/activity/home',
         imgUrl: expect.stringContaining('/assets/share/share_card_cover.jpg'),
       }),
     )
     expect(updateAppMessageShareData).toHaveBeenCalledWith(
       expect.objectContaining({
-        title: expect.stringContaining('六月牛气加油签'),
-        desc: expect.stringContaining('PrimeCuts'),
+        title: expect.stringContaining('高考抽签专属福利'),
+        desc: expect.stringContaining('抽签即领优惠券福利'),
         link: 'http://localhost/activity/home',
         imgUrl: expect.stringContaining('/assets/share/share_card_cover.jpg'),
       }),
@@ -984,7 +985,7 @@ describe('P1 activity home', () => {
     expect(updateAppMessageShareData).toHaveBeenCalledWith(
       expect.objectContaining({
         title: expect.stringContaining('过儿签'),
-        desc: expect.stringContaining('PrimeCuts'),
+        desc: expect.stringContaining('抽签即领优惠券福利'),
         link: 'http://localhost/activity/home?share_token=SH_WX_RESULT',
         imgUrl: expect.stringContaining('/assets/share/share_card_cover.jpg'),
       }),
