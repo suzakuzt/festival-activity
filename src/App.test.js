@@ -106,6 +106,14 @@ describe('P1 activity home', () => {
     expect(html).not.toContain('<title>festival-activity</title>')
   })
 
+  it('exposes a hidden share cover image for WeChat link-card fallback crawling', () => {
+    const html = readSource('index.html')
+
+    expect(html).toContain('data-wechat-share-cover="true"')
+    expect(html).toContain('src="/assets/share/share_card_cover.jpg"')
+    expect(html).toContain('position:absolute;left:-9999px;top:-9999px')
+  })
+
   it('configures a default WeChat timeline card before users tap in-page share actions', async () => {
     const config = vi.fn()
     const ready = vi.fn((callback) => callback())
