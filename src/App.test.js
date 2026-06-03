@@ -99,6 +99,59 @@ describe('P1 activity home', () => {
     expect(html).toContain('https://res.wx.qq.com/open/js/jweixin-1.6.0.js')
   })
 
+  it('uses the activity name as the browser title fallback for WeChat timeline sharing', () => {
+    const html = readSource('index.html')
+
+    expect(html).toContain('<title>一举高中 · 六月牛气加油签</title>')
+    expect(html).not.toContain('<title>festival-activity</title>')
+  })
+
+  it('configures a default WeChat timeline card before users tap in-page share actions', async () => {
+    const config = vi.fn()
+    const ready = vi.fn((callback) => callback())
+    const error = vi.fn()
+    const updateAppMessageShareData = vi.fn()
+    const updateTimelineShareData = vi.fn()
+    window.wx = {
+      config,
+      ready,
+      error,
+      updateAppMessageShareData,
+      updateTimelineShareData,
+    }
+    const getWechatJssdkSignature = vi.fn().mockResolvedValue({
+      appId: 'wx_default_share',
+      timestamp: 1717200001,
+      nonceStr: 'nonce_default',
+      signature: 'signature_default',
+      jsApiList: ['updateAppMessageShareData', 'updateTimelineShareData'],
+    })
+
+    mountHome({
+      apiClient: {
+        getWechatJssdkSignature,
+        trackEvent: vi.fn().mockResolvedValue({}),
+      },
+    })
+    await flushPromises()
+
+    expect(updateTimelineShareData).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: expect.stringContaining('六月牛气加油签'),
+        link: 'http://localhost/activity/home',
+        imgUrl: expect.stringContaining('/assets/share/share_card_cover.jpg'),
+      }),
+    )
+    expect(updateAppMessageShareData).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: expect.stringContaining('六月牛气加油签'),
+        desc: expect.stringContaining('PrimeCuts'),
+        link: 'http://localhost/activity/home',
+        imgUrl: expect.stringContaining('/assets/share/share_card_cover.jpg'),
+      }),
+    )
+  })
+
   it('keeps the activity share poster out of the initial home DOM and uses the optimized WebP asset', async () => {
     const wrapper = mountHome()
 
@@ -925,14 +978,14 @@ describe('P1 activity home', () => {
         title: expect.stringContaining('过儿签'),
         desc: expect.stringContaining('PrimeCuts'),
         link: 'http://localhost/activity/home?share_token=SH_WX_RESULT',
-        imgUrl: expect.stringContaining('/assets/share/share_activity_poster.webp'),
+        imgUrl: expect.stringContaining('/assets/share/share_card_cover.jpg'),
       }),
     )
     expect(updateTimelineShareData).toHaveBeenCalledWith(
       expect.objectContaining({
         title: expect.stringContaining('过儿签'),
         link: 'http://localhost/activity/home?share_token=SH_WX_RESULT',
-        imgUrl: expect.stringContaining('/assets/share/share_activity_poster.webp'),
+        imgUrl: expect.stringContaining('/assets/share/share_card_cover.jpg'),
       }),
     )
   })

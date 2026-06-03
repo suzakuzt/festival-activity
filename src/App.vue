@@ -741,6 +741,9 @@ const POSTER_SAVE_SUCCESS_MESSAGE = '保存成功，手机端请长按上方图�
 const POSTER_GENERATED_MESSAGE = '海报已生成，手机端请长按上方图片保存到相册'
 const MINI_PROGRAM_POSTER_SAVE_MESSAGE = '正在打开小程序保存到相册...'
 const RESULT_WECHAT_SHARE_DESC = 'PrimeCuts 璞莱牧高考考运签，抽签还能领好礼'
+const DEFAULT_WECHAT_SHARE_TITLE = '一举高中 · 六月牛气加油签'
+const DEFAULT_WECHAT_TIMELINE_SHARE_TITLE = '一举高中 · 六月牛气加油签，抽你的六月考运'
+const WECHAT_SHARE_CARD_IMAGE = shareAsset('share_card_cover.jpg')
 const toAbsolutePosterUrl = (posterUrl) => {
   if (!posterUrl) {
     return ''
@@ -789,7 +792,7 @@ const configureResultWechatShare = async (shareResult) => {
       desc: RESULT_WECHAT_SHARE_DESC,
       timelineTitle: shareTitle,
       link: shareResult.share_url,
-      imgUrl: shareAsset('share_activity_poster.webp'),
+      imgUrl: WECHAT_SHARE_CARD_IMAGE,
       onShareSuccess: (target) => {
         trackEvent('wechat_share_success', {
           share_target: target,
@@ -804,6 +807,31 @@ const configureResultWechatShare = async (shareResult) => {
   } catch (error) {
     trackEvent('wechat_share_config_fail', {
       share_token: shareResult.share_token,
+      message: error instanceof Error ? error.message : 'wechat share config failed',
+    })
+  }
+}
+const configureDefaultWechatShare = async () => {
+  try {
+    const result = await configureWechatShare({
+      apiClient: props.apiClient ?? activityApi,
+      title: DEFAULT_WECHAT_SHARE_TITLE,
+      desc: RESULT_WECHAT_SHARE_DESC,
+      timelineTitle: DEFAULT_WECHAT_TIMELINE_SHARE_TITLE,
+      link: '/activity/home',
+      imgUrl: WECHAT_SHARE_CARD_IMAGE,
+      onShareSuccess: (target) => {
+        trackEvent('wechat_share_success', {
+          share_target: target,
+          share_token: 'default',
+        })
+      },
+    })
+    trackEvent(result.configured ? 'wechat_default_share_config_success' : 'wechat_default_share_config_skip', {
+      reason: result.reason,
+    })
+  } catch (error) {
+    trackEvent('wechat_default_share_config_fail', {
       message: error instanceof Error ? error.message : 'wechat share config failed',
     })
   }
@@ -1530,6 +1558,7 @@ onMounted(async () => {
   }
   await nextTick()
   void scheduleP2ResultAiLayout()
+  void configureDefaultWechatShare()
   runtimeMonitor?.checkPageNodes()
 })
 
@@ -1539,6 +1568,7 @@ watch(currentPage, async () => {
   }
   await nextTick()
   void scheduleP2ResultAiLayout()
+  void configureDefaultWechatShare()
   runtimeMonitor?.checkPageNodes()
 })
 
