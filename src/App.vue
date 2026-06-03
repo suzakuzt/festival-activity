@@ -169,6 +169,7 @@ const optimizeLocalAssetUrl = (value) => {
 }
 const localImageAsset = (asset, name) => asset(webpName(name))
 const homeImageAsset = (name) => localImageAsset(homeAsset, name)
+const p2ImageAsset = (name) => localImageAsset(p2Asset, name)
 const p4ImageAsset = (name) => localImageAsset(p4Asset, name)
 const p5ImageAsset = (name) => localImageAsset(p5Asset, name)
 const p6ImageAsset = (name) => localImageAsset(p6Asset, name)
@@ -1171,7 +1172,7 @@ const renderResultSharePosterCanvas = async () => {
   }
 
   try {
-    const logo = await loadPosterCanvasImage(homeImageAsset('logo_prime_cuts_home.png'))
+    const logo = await loadPosterCanvasImage(p2ImageAsset('text_prime_cuts_logo.png'))
     const logoWidth = width * 0.22
     const logoHeight = logoWidth * (Number(logo.naturalHeight || logo.height) / Number(logo.naturalWidth || logo.width))
     drawContainedPosterImage(ctx, logo, width * 0.108, height * 0.042, logoWidth, logoHeight)
@@ -1879,7 +1880,7 @@ onBeforeUnmount(() => {
             <img
               class="result-share-brand-logo"
               data-testid="result-share-brand-logo"
-              :src="homeImageAsset('logo_prime_cuts_home.png')"
+              :src="p2ImageAsset('text_prime_cuts_logo.png')"
               alt="Prime Cuts 璞莱牧"
               loading="lazy"
               decoding="async"

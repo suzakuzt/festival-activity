@@ -595,7 +595,7 @@ describe('P1 activity home', () => {
       'bg_result_share_no_ai.webp',
     )
     expect(poster.get('[data-testid="result-share-brand-logo"]').attributes('src')).toContain(
-      'logo_prime_cuts_home.webp',
+      'text_prime_cuts_logo.webp',
     )
     expect(poster.get('[data-testid="result-share-brand-logo"]').attributes('alt')).toBe('Prime Cuts 璞莱牧')
     expect(poster.get('[data-testid="result-share-fortune-copy"]').classes()).toContain('p2-fortune-copy')
@@ -1100,7 +1100,7 @@ describe('P1 activity home', () => {
     expect(wrapper.get('[data-testid="p2-poster-longpress-tip"]').text()).toBe('长按海报可保存/分享')
     expect(canvasContext.drawImage).toHaveBeenCalled()
     expect(loadedImageSources.some((src) => decodeURIComponent(src).includes('bg_result_share_no_ai.webp'))).toBe(true)
-    expect(loadedImageSources.some((src) => decodeURIComponent(src).includes('logo_prime_cuts_home.webp'))).toBe(true)
+    expect(loadedImageSources.some((src) => decodeURIComponent(src).includes('text_prime_cuts_logo.webp'))).toBe(true)
     expect(loadedImageSources.some((src) => decodeURIComponent(src).includes('share_mascot_zhuangyuan.webp'))).toBe(true)
     expect(loadedImageSources.some((src) => decodeURIComponent(src).includes('/activity/home?share_token=SH_RESULT_PREVIEW'))).toBe(
       true,
