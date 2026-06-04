@@ -168,6 +168,54 @@ describe('P1 activity home', () => {
     )
   })
 
+  it('registers legacy WeChat share menus when only deprecated share APIs are available', async () => {
+    const config = vi.fn()
+    const ready = vi.fn((callback) => callback())
+    const error = vi.fn()
+    const onMenuShareAppMessage = vi.fn()
+    const onMenuShareTimeline = vi.fn()
+    window.wx = {
+      config,
+      ready,
+      error,
+      onMenuShareAppMessage,
+      onMenuShareTimeline,
+    }
+    const getWechatJssdkSignature = vi.fn().mockResolvedValue({
+      appId: 'wx_legacy_share',
+      timestamp: 1717200002,
+      nonceStr: 'nonce_legacy',
+      signature: 'signature_legacy',
+      jsApiList: ['updateAppMessageShareData', 'updateTimelineShareData', 'onMenuShareAppMessage', 'onMenuShareTimeline'],
+    })
+
+    mountHome({
+      apiClient: {
+        getWechatJssdkSignature,
+        trackEvent: vi.fn().mockResolvedValue({}),
+      },
+    })
+    await flushPromises()
+
+    expect(config).toHaveBeenCalledWith(
+      expect.objectContaining({
+        jsApiList: expect.arrayContaining(['onMenuShareAppMessage', 'onMenuShareTimeline']),
+      }),
+    )
+    expect(onMenuShareAppMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        link: 'http://localhost/activity/home',
+        imgUrl: expect.stringContaining('/assets/share/share_card_cover.jpg'),
+      }),
+    )
+    expect(onMenuShareTimeline).toHaveBeenCalledWith(
+      expect.objectContaining({
+        link: 'http://localhost/activity/home',
+        imgUrl: expect.stringContaining('/assets/share/share_card_cover.jpg'),
+      }),
+    )
+  })
+
   it('keeps the activity share poster out of the initial home DOM and uses the optimized WebP asset', async () => {
     const wrapper = mountHome()
 

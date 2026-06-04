@@ -12,7 +12,12 @@ from .local_env import load_local_env
 
 WECHAT_TOKEN_URL = "https://api.weixin.qq.com/cgi-bin/token"
 WECHAT_TICKET_URL = "https://api.weixin.qq.com/cgi-bin/ticket/getticket"
-WECHAT_SHARE_JS_API_LIST = ["updateAppMessageShareData", "updateTimelineShareData"]
+WECHAT_SHARE_JS_API_LIST = [
+    "updateAppMessageShareData",
+    "updateTimelineShareData",
+    "onMenuShareAppMessage",
+    "onMenuShareTimeline",
+]
 _CACHE_TTL_SKEW_SECONDS = 120
 _ACCESS_TOKEN_CACHE: dict[str, object] = {"value": "", "expires_at": 0.0}
 _JSAPI_TICKET_CACHE: dict[str, object] = {"value": "", "expires_at": 0.0}

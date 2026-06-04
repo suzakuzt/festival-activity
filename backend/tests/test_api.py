@@ -696,6 +696,8 @@ class ActivityApiFlowTests(unittest.TestCase):
         self.assertEqual(payload["signature"], hashlib.sha1(expected_raw.encode("utf-8")).hexdigest())
         self.assertIn("updateAppMessageShareData", payload["jsApiList"])
         self.assertIn("updateTimelineShareData", payload["jsApiList"])
+        self.assertIn("onMenuShareAppMessage", payload["jsApiList"])
+        self.assertIn("onMenuShareTimeline", payload["jsApiList"])
 
     def test_wechat_jssdk_signature_requires_official_account_config(self):
         response = self.client.post("/api/wechat/jssdk-signature", json={"url": "https://activity.kpcc-tech.com/activity/result"})

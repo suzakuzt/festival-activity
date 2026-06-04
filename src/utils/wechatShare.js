@@ -1,4 +1,9 @@
-export const WECHAT_SHARE_JS_API_LIST = ['updateAppMessageShareData', 'updateTimelineShareData']
+export const WECHAT_SHARE_JS_API_LIST = [
+  'updateAppMessageShareData',
+  'updateTimelineShareData',
+  'onMenuShareAppMessage',
+  'onMenuShareTimeline',
+]
 
 const getWechatBridge = () => (typeof window === 'undefined' ? undefined : window.wx)
 
@@ -16,6 +21,14 @@ export const toAbsoluteShareUrl = (value = '') => {
   }
 
   return new URL(value, window.location.origin).href
+}
+
+const isWechatDebugEnabled = () => {
+  if (typeof window === 'undefined') {
+    return false
+  }
+
+  return new URLSearchParams(window.location.search).get('wxdebug') === '1'
 }
 
 export const configureWechatShare = async ({
@@ -48,23 +61,33 @@ export const configureWechatShare = async ({
     }
     const applyShareData = () => {
       let configured = false
+      const friendShareData = {
+        title,
+        desc,
+        link: shareLink,
+        imgUrl: shareImage,
+        success: () => onShareSuccess?.('friend'),
+      }
+      const timelineShareData = {
+        title: timelineTitle || title,
+        link: shareLink,
+        imgUrl: shareImage,
+        success: () => onShareSuccess?.('timeline'),
+      }
       if (typeof wx.updateAppMessageShareData === 'function') {
-        wx.updateAppMessageShareData({
-          title,
-          desc,
-          link: shareLink,
-          imgUrl: shareImage,
-          success: () => onShareSuccess?.('friend'),
-        })
+        wx.updateAppMessageShareData(friendShareData)
+        configured = true
+      }
+      if (typeof wx.onMenuShareAppMessage === 'function') {
+        wx.onMenuShareAppMessage(friendShareData)
         configured = true
       }
       if (typeof wx.updateTimelineShareData === 'function') {
-        wx.updateTimelineShareData({
-          title: timelineTitle || title,
-          link: shareLink,
-          imgUrl: shareImage,
-          success: () => onShareSuccess?.('timeline'),
-        })
+        wx.updateTimelineShareData(timelineShareData)
+        configured = true
+      }
+      if (typeof wx.onMenuShareTimeline === 'function') {
+        wx.onMenuShareTimeline(timelineShareData)
         configured = true
       }
       finish({ configured, reason: configured ? 'ready' : 'share_api_unavailable' })
@@ -81,7 +104,7 @@ export const configureWechatShare = async ({
     }
 
     wx.config({
-      debug: false,
+      debug: isWechatDebugEnabled(),
       appId: signature.appId,
       timestamp: signature.timestamp,
       nonceStr: signature.nonceStr,
