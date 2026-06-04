@@ -107,6 +107,13 @@ describe('P1 activity home', () => {
     expect(html).not.toContain('<title>festival-activity</title>')
   })
 
+  it('uses the Prime Cuts badge as the browser tab favicon', () => {
+    const html = readSource('index.html')
+
+    expect(html).toContain('<link rel="icon" type="image/png" sizes="128x128" href="/assets/brand/prime-cuts-favicon.png" />')
+    expect(html).not.toContain('href="/favicon.svg"')
+  })
+
   it('exposes a hidden share cover image for WeChat link-card fallback crawling', () => {
     const html = readSource('index.html')
 
