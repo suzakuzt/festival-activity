@@ -789,6 +789,14 @@ const updateSharePosterQrcode = async (shareResult) => {
     return false
   }
 }
+const createWechatShareDebugTracker = (scope, extraPayload = {}) => (debugEvent, debugPayload = '') => {
+  trackEvent('wechat_share_debug', {
+    scope,
+    ...extraPayload,
+    debug_event: debugEvent,
+    debug_payload: debugPayload,
+  })
+}
 const configureResultWechatShare = async (shareResult) => {
   if (!shareResult?.share_url) {
     return
@@ -803,6 +811,9 @@ const configureResultWechatShare = async (shareResult) => {
       timelineTitle: shareTitle,
       link: withWechatShareVersion(shareResult.share_url),
       imgUrl: WECHAT_SHARE_CARD_IMAGE,
+      onDebugEvent: createWechatShareDebugTracker('result', {
+        share_token: shareResult.share_token,
+      }),
       onShareSuccess: (target) => {
         trackEvent('wechat_share_success', {
           share_target: target,
@@ -830,6 +841,7 @@ const configureDefaultWechatShare = async () => {
       timelineTitle: DEFAULT_WECHAT_TIMELINE_SHARE_TITLE,
       link: withWechatShareVersion('/activity/home'),
       imgUrl: WECHAT_SHARE_CARD_IMAGE,
+      onDebugEvent: createWechatShareDebugTracker('default'),
       onShareSuccess: (target) => {
         trackEvent('wechat_share_success', {
           share_target: target,

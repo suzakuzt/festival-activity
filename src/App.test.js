@@ -238,11 +238,12 @@ describe('P1 activity home', () => {
       jsApiList: ['updateAppMessageShareData', 'updateTimelineShareData'],
     })
 
+    const trackEvent = vi.fn().mockResolvedValue({})
     mount(App, {
       props: {
         apiClient: {
           getWechatJssdkSignature,
-          trackEvent: vi.fn().mockResolvedValue({}),
+          trackEvent,
         },
       },
     })
@@ -256,6 +257,19 @@ describe('P1 activity home', () => {
     expect(panel?.textContent).toContain('share_card_thumb_20260604_v3.jpg')
     expect(panel?.textContent).toContain('call_updateAppMessageShareData')
     expect(panel?.textContent).toContain('call_updateTimelineShareData')
+    expect(trackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event_name: 'wechat_share_debug',
+        event_payload: expect.objectContaining({
+          scope: 'default',
+          debug_event: 'finish',
+          debug_payload: expect.objectContaining({
+            configured: true,
+            reason: 'ready',
+          }),
+        }),
+      }),
+    )
   })
 
   it('keeps the activity share poster out of the initial home DOM and uses the optimized WebP asset', async () => {
