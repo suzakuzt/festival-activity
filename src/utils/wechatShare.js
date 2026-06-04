@@ -246,13 +246,13 @@ export const configureWechatShare = async ({
     }
 
     recordWechatShareDebug('wx_config_call', {
-      debug: isWechatDebugEnabled(),
+      debug: false,
       appId: signature.appId,
       timestamp: signature.timestamp,
       jsApiList,
     }, onDebugEvent)
     wx.config({
-      debug: isWechatDebugEnabled(),
+      debug: false,
       appId: signature.appId,
       timestamp: signature.timestamp,
       nonceStr: signature.nonceStr,
