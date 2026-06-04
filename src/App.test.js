@@ -118,7 +118,7 @@ describe('P1 activity home', () => {
     const html = readSource('index.html')
 
     expect(html).toContain('data-wechat-share-cover="true"')
-    expect(html).toContain('src="/assets/share/share_card_cover.jpg"')
+    expect(html).toContain('src="/assets/share/share_card_thumb.jpg?v=20260604-share-card-v2"')
     expect(html).toContain('position:absolute;left:-9999px;top:-9999px')
   })
 
@@ -154,16 +154,16 @@ describe('P1 activity home', () => {
     expect(updateTimelineShareData).toHaveBeenCalledWith(
       expect.objectContaining({
         title: expect.stringContaining('高考抽签专属福利'),
-        link: 'http://localhost/activity/home',
-        imgUrl: expect.stringContaining('/assets/share/share_card_cover.jpg'),
+        link: 'http://localhost/activity/home?share_v=20260604-share-card-v2',
+        imgUrl: expect.stringContaining('/assets/share/share_card_thumb.jpg?v=20260604-share-card-v2'),
       }),
     )
     expect(updateAppMessageShareData).toHaveBeenCalledWith(
       expect.objectContaining({
         title: expect.stringContaining('高考抽签专属福利'),
         desc: expect.stringContaining('抽签即领优惠券福利'),
-        link: 'http://localhost/activity/home',
-        imgUrl: expect.stringContaining('/assets/share/share_card_cover.jpg'),
+        link: 'http://localhost/activity/home?share_v=20260604-share-card-v2',
+        imgUrl: expect.stringContaining('/assets/share/share_card_thumb.jpg?v=20260604-share-card-v2'),
       }),
     )
   })
@@ -204,14 +204,14 @@ describe('P1 activity home', () => {
     )
     expect(onMenuShareAppMessage).toHaveBeenCalledWith(
       expect.objectContaining({
-        link: 'http://localhost/activity/home',
-        imgUrl: expect.stringContaining('/assets/share/share_card_cover.jpg'),
+        link: 'http://localhost/activity/home?share_v=20260604-share-card-v2',
+        imgUrl: expect.stringContaining('/assets/share/share_card_thumb.jpg?v=20260604-share-card-v2'),
       }),
     )
     expect(onMenuShareTimeline).toHaveBeenCalledWith(
       expect.objectContaining({
-        link: 'http://localhost/activity/home',
-        imgUrl: expect.stringContaining('/assets/share/share_card_cover.jpg'),
+        link: 'http://localhost/activity/home?share_v=20260604-share-card-v2',
+        imgUrl: expect.stringContaining('/assets/share/share_card_thumb.jpg?v=20260604-share-card-v2'),
       }),
     )
   })
@@ -1041,15 +1041,15 @@ describe('P1 activity home', () => {
       expect.objectContaining({
         title: expect.stringContaining('过儿签'),
         desc: expect.stringContaining('抽签即领优惠券福利'),
-        link: 'http://localhost/activity/home?share_token=SH_WX_RESULT',
-        imgUrl: expect.stringContaining('/assets/share/share_card_cover.jpg'),
+        link: 'http://localhost/activity/home?share_token=SH_WX_RESULT&share_v=20260604-share-card-v2',
+        imgUrl: expect.stringContaining('/assets/share/share_card_thumb.jpg?v=20260604-share-card-v2'),
       }),
     )
     expect(updateTimelineShareData).toHaveBeenCalledWith(
       expect.objectContaining({
         title: expect.stringContaining('过儿签'),
-        link: 'http://localhost/activity/home?share_token=SH_WX_RESULT',
-        imgUrl: expect.stringContaining('/assets/share/share_card_cover.jpg'),
+        link: 'http://localhost/activity/home?share_token=SH_WX_RESULT&share_v=20260604-share-card-v2',
+        imgUrl: expect.stringContaining('/assets/share/share_card_thumb.jpg?v=20260604-share-card-v2'),
       }),
     )
   })

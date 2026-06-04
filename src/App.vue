@@ -743,7 +743,17 @@ const MINI_PROGRAM_POSTER_SAVE_MESSAGE = '正在打开小程序保存到相册..
 const RESULT_WECHAT_SHARE_DESC = '测六月考运，抽签即领优惠券福利'
 const DEFAULT_WECHAT_SHARE_TITLE = '高考抽签专属福利｜Prime Cuts 璞莱牧'
 const DEFAULT_WECHAT_TIMELINE_SHARE_TITLE = '高考抽签专属福利，抽签即领优惠券福利'
-const WECHAT_SHARE_CARD_IMAGE = shareAsset('share_card_cover.jpg')
+const WECHAT_SHARE_CACHE_VERSION = '20260604-share-card-v2'
+const WECHAT_SHARE_CARD_IMAGE = `${shareAsset('share_card_thumb.jpg')}?v=${WECHAT_SHARE_CACHE_VERSION}`
+const withWechatShareVersion = (value) => {
+  if (!value || typeof window === 'undefined') {
+    return value
+  }
+
+  const url = new URL(value, window.location.origin)
+  url.searchParams.set('share_v', WECHAT_SHARE_CACHE_VERSION)
+  return url.href
+}
 const toAbsolutePosterUrl = (posterUrl) => {
   if (!posterUrl) {
     return ''
@@ -791,7 +801,7 @@ const configureResultWechatShare = async (shareResult) => {
       title: shareTitle,
       desc: RESULT_WECHAT_SHARE_DESC,
       timelineTitle: shareTitle,
-      link: shareResult.share_url,
+      link: withWechatShareVersion(shareResult.share_url),
       imgUrl: WECHAT_SHARE_CARD_IMAGE,
       onShareSuccess: (target) => {
         trackEvent('wechat_share_success', {
@@ -818,7 +828,7 @@ const configureDefaultWechatShare = async () => {
       title: DEFAULT_WECHAT_SHARE_TITLE,
       desc: RESULT_WECHAT_SHARE_DESC,
       timelineTitle: DEFAULT_WECHAT_TIMELINE_SHARE_TITLE,
-      link: '/activity/home',
+      link: withWechatShareVersion('/activity/home'),
       imgUrl: WECHAT_SHARE_CARD_IMAGE,
       onShareSuccess: (target) => {
         trackEvent('wechat_share_success', {
