@@ -31,6 +31,89 @@ const isWechatDebugEnabled = () => {
   return new URLSearchParams(window.location.search).get('wxdebug') === '1'
 }
 
+const formatDebugValue = (value) => {
+  if (typeof value === 'string') {
+    return value
+  }
+
+  try {
+    return JSON.stringify(value)
+  } catch {
+    return String(value)
+  }
+}
+
+const renderWechatShareDebugPanel = () => {
+  if (!isWechatDebugEnabled() || typeof document === 'undefined') {
+    return
+  }
+
+  const entries = window.__WECHAT_SHARE_DEBUG__ || []
+  let panel = document.querySelector('[data-testid="wechat-share-debug-panel"]')
+  if (!panel) {
+    panel = document.createElement('pre')
+    panel.dataset.testid = 'wechat-share-debug-panel'
+    panel.style.position = 'fixed'
+    panel.style.left = '8px'
+    panel.style.right = '8px'
+    panel.style.bottom = '8px'
+    panel.style.zIndex = '99999'
+    panel.style.maxHeight = '42vh'
+    panel.style.overflow = 'auto'
+    panel.style.margin = '0'
+    panel.style.padding = '10px'
+    panel.style.borderRadius = '8px'
+    panel.style.background = 'rgba(0, 0, 0, 0.82)'
+    panel.style.color = '#fff'
+    panel.style.font = '12px/1.45 monospace'
+    panel.style.whiteSpace = 'pre-wrap'
+    document.body.appendChild(panel)
+  }
+
+  panel.textContent = [
+    'WeChat Share Debug',
+    ...entries.slice(-40).map((entry) => `[${entry.time}] ${entry.label}: ${formatDebugValue(entry.value)}`),
+  ].join('\n')
+}
+
+const recordWechatShareDebug = (label, value = '') => {
+  if (!isWechatDebugEnabled() || typeof window === 'undefined') {
+    return
+  }
+
+  window.__WECHAT_SHARE_DEBUG__ = window.__WECHAT_SHARE_DEBUG__ || []
+  window.__WECHAT_SHARE_DEBUG__.push({
+    label,
+    value,
+    time: new Date().toLocaleTimeString('zh-CN', { hour12: false }),
+  })
+  renderWechatShareDebugPanel()
+  console.log('[wechat-share-debug]', label, value)
+}
+
+const getWechatApiAvailability = (wx) =>
+  WECHAT_SHARE_JS_API_LIST.reduce((result, apiName) => {
+    result[apiName] = typeof wx?.[apiName] === 'function'
+    return result
+  }, {})
+
+const probeWechatShareImage = (src) => {
+  if (!isWechatDebugEnabled() || !src || typeof window === 'undefined' || typeof Image !== 'function') {
+    return
+  }
+
+  const image = new Image()
+  image.onload = () =>
+    recordWechatShareDebug('image_load_ok', {
+      src,
+      width: image.naturalWidth,
+      height: image.naturalHeight,
+    })
+  image.onerror = () => recordWechatShareDebug('image_load_error', src)
+  recordWechatShareDebug('image_load_start', src)
+  image.src = src
+}
+
 export const configureWechatShare = async ({
   apiClient,
   title,
@@ -43,23 +126,52 @@ export const configureWechatShare = async ({
   const wx = getWechatBridge()
   const getWechatJssdkSignature = apiClient?.getWechatJssdkSignature
   if (!wx || typeof wx.config !== 'function' || typeof getWechatJssdkSignature !== 'function') {
+    recordWechatShareDebug('wechat_unavailable', {
+      hasWx: Boolean(wx),
+      hasConfig: typeof wx?.config === 'function',
+      hasSignatureApi: typeof getWechatJssdkSignature === 'function',
+    })
     return { configured: false, reason: 'wechat_unavailable' }
   }
 
-  const signature = await getWechatJssdkSignature({ url: getWechatSignatureUrl() })
+  const signatureUrl = getWechatSignatureUrl()
+  recordWechatShareDebug('signature_url', signatureUrl)
+  let signature
+  try {
+    signature = await getWechatJssdkSignature({ url: signatureUrl })
+  } catch (error) {
+    recordWechatShareDebug('signature_error', error instanceof Error ? error.message : error)
+    throw error
+  }
   const jsApiList = signature.jsApiList?.length ? signature.jsApiList : WECHAT_SHARE_JS_API_LIST
   const shareLink = toAbsoluteShareUrl(link)
   const shareImage = toAbsoluteShareUrl(imgUrl)
+  recordWechatShareDebug('signature_ok', {
+    appId: signature.appId,
+    timestamp: signature.timestamp,
+    jsApiList,
+  })
+  recordWechatShareDebug('share_title', title)
+  recordWechatShareDebug('share_desc', desc)
+  recordWechatShareDebug('timeline_title', timelineTitle || title)
+  recordWechatShareDebug('share_link', shareLink)
+  recordWechatShareDebug('share_image', shareImage)
+  recordWechatShareDebug('api_available_before_config', getWechatApiAvailability(wx))
+  probeWechatShareImage(shareImage)
 
   return new Promise((resolve) => {
     let settled = false
+    let readyFired = false
     const finish = (result) => {
       if (!settled) {
         settled = true
+        recordWechatShareDebug('finish', result)
         resolve(result)
       }
     }
     const applyShareData = () => {
+      readyFired = true
+      recordWechatShareDebug('wx_ready', getWechatApiAvailability(wx))
       let configured = false
       const friendShareData = {
         title,
@@ -75,18 +187,22 @@ export const configureWechatShare = async ({
         success: () => onShareSuccess?.('timeline'),
       }
       if (typeof wx.updateAppMessageShareData === 'function') {
+        recordWechatShareDebug('call_updateAppMessageShareData', friendShareData)
         wx.updateAppMessageShareData(friendShareData)
         configured = true
       }
       if (typeof wx.onMenuShareAppMessage === 'function') {
+        recordWechatShareDebug('call_onMenuShareAppMessage', friendShareData)
         wx.onMenuShareAppMessage(friendShareData)
         configured = true
       }
       if (typeof wx.updateTimelineShareData === 'function') {
+        recordWechatShareDebug('call_updateTimelineShareData', timelineShareData)
         wx.updateTimelineShareData(timelineShareData)
         configured = true
       }
       if (typeof wx.onMenuShareTimeline === 'function') {
+        recordWechatShareDebug('call_onMenuShareTimeline', timelineShareData)
         wx.onMenuShareTimeline(timelineShareData)
         configured = true
       }
@@ -94,7 +210,10 @@ export const configureWechatShare = async ({
     }
 
     if (typeof wx.error === 'function') {
-      wx.error((error) => finish({ configured: false, reason: 'wechat_config_error', error }))
+      wx.error((error) => {
+        recordWechatShareDebug('wx_error', error)
+        finish({ configured: false, reason: 'wechat_config_error', error })
+      })
     }
 
     if (typeof wx.ready === 'function') {
@@ -103,6 +222,20 @@ export const configureWechatShare = async ({
       applyShareData()
     }
 
+    if (isWechatDebugEnabled()) {
+      window.setTimeout(() => {
+        if (!readyFired && !settled) {
+          recordWechatShareDebug('wx_ready_timeout', 'wx.ready did not fire within 5000ms')
+        }
+      }, 5000)
+    }
+
+    recordWechatShareDebug('wx_config_call', {
+      debug: isWechatDebugEnabled(),
+      appId: signature.appId,
+      timestamp: signature.timestamp,
+      jsApiList,
+    })
     wx.config({
       debug: isWechatDebugEnabled(),
       appId: signature.appId,

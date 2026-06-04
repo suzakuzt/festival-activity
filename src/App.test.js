@@ -216,6 +216,48 @@ describe('P1 activity home', () => {
     )
   })
 
+  it('shows detailed WeChat share diagnostics when wxdebug is enabled', async () => {
+    window.history.replaceState({}, '', '/activity/home?wxdebug=1')
+    const config = vi.fn()
+    const ready = vi.fn((callback) => callback())
+    const error = vi.fn()
+    const updateAppMessageShareData = vi.fn()
+    const updateTimelineShareData = vi.fn()
+    window.wx = {
+      config,
+      ready,
+      error,
+      updateAppMessageShareData,
+      updateTimelineShareData,
+    }
+    const getWechatJssdkSignature = vi.fn().mockResolvedValue({
+      appId: 'wx_debug_share',
+      timestamp: 1717200003,
+      nonceStr: 'nonce_debug',
+      signature: 'signature_debug',
+      jsApiList: ['updateAppMessageShareData', 'updateTimelineShareData'],
+    })
+
+    mount(App, {
+      props: {
+        apiClient: {
+          getWechatJssdkSignature,
+          trackEvent: vi.fn().mockResolvedValue({}),
+        },
+      },
+    })
+    await flushPromises()
+
+    expect(config).toHaveBeenCalledWith(expect.objectContaining({ debug: true }))
+    const panel = document.querySelector('[data-testid="wechat-share-debug-panel"]')
+    expect(panel?.textContent).toContain('signature_url')
+    expect(panel?.textContent).toContain('/activity/home?wxdebug=1')
+    expect(panel?.textContent).toContain('share_image')
+    expect(panel?.textContent).toContain('share_card_thumb.jpg?v=20260604-share-card-v2')
+    expect(panel?.textContent).toContain('call_updateAppMessageShareData')
+    expect(panel?.textContent).toContain('call_updateTimelineShareData')
+  })
+
   it('keeps the activity share poster out of the initial home DOM and uses the optimized WebP asset', async () => {
     const wrapper = mountHome()
 
