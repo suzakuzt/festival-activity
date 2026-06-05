@@ -130,7 +130,7 @@ describe('P1 activity home', () => {
 
   it('provides a root share cover image for WeChat card crawling', () => {
     expect(readPngSize('public/share-cover.png')).toEqual({ width: 300, height: 300 })
-    expect(fileSizeKb('public/share-cover.png')).toBeLessThan(100)
+    expect(fileSizeKb('public/share-cover.png')).toBeLessThan(50)
   })
 
   it('configures a default WeChat timeline card before users tap in-page share actions', async () => {
