@@ -188,35 +188,46 @@ export const configureWechatShare = async ({
       readyFired = true
       recordWechatShareDebug('wx_ready', getWechatApiAvailability(wx), onDebugEvent)
       let configured = false
-      const friendShareData = {
+      const createShareData = (shareData, target, apiName) => ({
+        ...shareData,
+        success: () => {
+          recordWechatShareDebug(`${apiName}_success`, { target }, onDebugEvent)
+          onShareSuccess?.(target)
+        },
+        fail: (error) => recordWechatShareDebug(`${apiName}_fail`, error, onDebugEvent),
+        complete: (result) => recordWechatShareDebug(`${apiName}_complete`, result, onDebugEvent),
+      })
+      const friendShareBaseData = {
         title,
         desc,
         link: shareLink,
         imgUrl: shareImage,
-        success: () => onShareSuccess?.('friend'),
       }
-      const timelineShareData = {
+      const timelineShareBaseData = {
         title: timelineTitle || title,
         link: shareLink,
         imgUrl: shareImage,
-        success: () => onShareSuccess?.('timeline'),
       }
       if (typeof wx.updateAppMessageShareData === 'function') {
+        const friendShareData = createShareData(friendShareBaseData, 'friend', 'updateAppMessageShareData')
         recordWechatShareDebug('call_updateAppMessageShareData', friendShareData, onDebugEvent)
         wx.updateAppMessageShareData(friendShareData)
         configured = true
       }
       if (typeof wx.onMenuShareAppMessage === 'function') {
+        const friendShareData = createShareData(friendShareBaseData, 'friend', 'onMenuShareAppMessage')
         recordWechatShareDebug('call_onMenuShareAppMessage', friendShareData, onDebugEvent)
         wx.onMenuShareAppMessage(friendShareData)
         configured = true
       }
       if (typeof wx.updateTimelineShareData === 'function') {
+        const timelineShareData = createShareData(timelineShareBaseData, 'timeline', 'updateTimelineShareData')
         recordWechatShareDebug('call_updateTimelineShareData', timelineShareData, onDebugEvent)
         wx.updateTimelineShareData(timelineShareData)
         configured = true
       }
       if (typeof wx.onMenuShareTimeline === 'function') {
+        const timelineShareData = createShareData(timelineShareBaseData, 'timeline', 'onMenuShareTimeline')
         recordWechatShareDebug('call_onMenuShareTimeline', timelineShareData, onDebugEvent)
         wx.onMenuShareTimeline(timelineShareData)
         configured = true
@@ -229,6 +240,28 @@ export const configureWechatShare = async ({
         recordWechatShareDebug('wx_error', error, onDebugEvent)
         finish({ configured: false, reason: 'wechat_config_error', error })
       })
+    }
+
+    const configPayload = {
+      debug: false,
+      appId: signature.appId,
+      timestamp: signature.timestamp,
+      nonceStr: signature.nonceStr,
+      signature: signature.signature,
+      jsApiList,
+    }
+    recordWechatShareDebug('wx_config_call', {
+      debug: configPayload.debug,
+      appId: configPayload.appId,
+      timestamp: configPayload.timestamp,
+      jsApiList: configPayload.jsApiList,
+    }, onDebugEvent)
+    try {
+      wx.config(configPayload)
+    } catch (error) {
+      recordWechatShareDebug('wx_config_throw', error instanceof Error ? error.message : error, onDebugEvent)
+      finish({ configured: false, reason: 'wechat_config_throw', error })
+      return
     }
 
     if (typeof wx.ready === 'function') {
@@ -244,20 +277,5 @@ export const configureWechatShare = async ({
         }
       }, 5000)
     }
-
-    recordWechatShareDebug('wx_config_call', {
-      debug: false,
-      appId: signature.appId,
-      timestamp: signature.timestamp,
-      jsApiList,
-    }, onDebugEvent)
-    wx.config({
-      debug: false,
-      appId: signature.appId,
-      timestamp: signature.timestamp,
-      nonceStr: signature.nonceStr,
-      signature: signature.signature,
-      jsApiList,
-    })
   })
 }

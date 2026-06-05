@@ -134,8 +134,12 @@ describe('P1 activity home', () => {
   })
 
   it('configures a default WeChat timeline card before users tap in-page share actions', async () => {
-    const config = vi.fn()
-    const ready = vi.fn((callback) => callback())
+    const callOrder = []
+    const config = vi.fn(() => callOrder.push('config'))
+    const ready = vi.fn((callback) => {
+      callOrder.push('ready')
+      callback()
+    })
     const error = vi.fn()
     const updateAppMessageShareData = vi.fn()
     const updateTimelineShareData = vi.fn()
@@ -162,6 +166,7 @@ describe('P1 activity home', () => {
     })
     await flushPromises()
 
+    expect(callOrder.slice(0, 2)).toEqual(['config', 'ready'])
     expect(updateTimelineShareData).toHaveBeenCalledWith(
       expect.objectContaining({
         title: expect.stringContaining('高考抽签专属福利'),
