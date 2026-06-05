@@ -114,16 +114,23 @@ describe('P1 activity home', () => {
     expect(html).not.toContain('href="/favicon.svg"')
   })
 
-  it('exposes a hidden share cover image for WeChat link-card fallback crawling', () => {
+  it('exposes absolute share metadata and hidden cover image for WeChat link-card fallback crawling', () => {
     const html = readSource('index.html')
 
+    expect(html).toContain('<meta property="og:title" content="高考抽签专属福利｜Prime Cuts 璞莱牧" />')
+    expect(html).toContain('<meta property="og:description" content="测六月考运，抽签即领优惠券福利" />')
+    expect(html).toContain('<meta property="og:image" content="https://activity.kpcc-tech.com/share-cover.png" />')
+    expect(html).toContain('<meta name="twitter:title" content="高考抽签专属福利｜Prime Cuts 璞莱牧" />')
+    expect(html).toContain('<meta name="twitter:description" content="测六月考运，抽签即领优惠券福利" />')
+    expect(html).toContain('<meta name="twitter:image" content="https://activity.kpcc-tech.com/share-cover.png" />')
     expect(html).toContain('data-wechat-share-cover="true"')
-    expect(html).toContain('src="/assets/share/share_card_thumb_20260604_v4.jpg"')
+    expect(html).toContain('src="https://activity.kpcc-tech.com/share-cover.png"')
     expect(html).toContain('position:absolute;left:-9999px;top:-9999px')
   })
 
-  it('keeps the WeChat share thumbnail under 20KB for iOS card crawling', () => {
-    expect(fileSizeKb('public/assets/share/share_card_thumb_20260604_v4.jpg')).toBeLessThan(20)
+  it('provides a root share cover image for WeChat card crawling', () => {
+    expect(readPngSize('public/share-cover.png')).toEqual({ width: 300, height: 300 })
+    expect(fileSizeKb('public/share-cover.png')).toBeLessThan(100)
   })
 
   it('configures a default WeChat timeline card before users tap in-page share actions', async () => {
@@ -158,16 +165,16 @@ describe('P1 activity home', () => {
     expect(updateTimelineShareData).toHaveBeenCalledWith(
       expect.objectContaining({
         title: expect.stringContaining('高考抽签专属福利'),
-        link: 'http://localhost/activity/home?share_v=20260604-share-card-v4',
-        imgUrl: expect.stringContaining('/assets/share/share_card_thumb_20260604_v4.jpg'),
+        link: 'http://localhost/activity/home?share_v=20260605-share-cover-v5',
+        imgUrl: 'https://activity.kpcc-tech.com/share-cover.png',
       }),
     )
     expect(updateAppMessageShareData).toHaveBeenCalledWith(
       expect.objectContaining({
         title: expect.stringContaining('高考抽签专属福利'),
         desc: expect.stringContaining('抽签即领优惠券福利'),
-        link: 'http://localhost/activity/home?share_v=20260604-share-card-v4',
-        imgUrl: expect.stringContaining('/assets/share/share_card_thumb_20260604_v4.jpg'),
+        link: 'http://localhost/activity/home?share_v=20260605-share-cover-v5',
+        imgUrl: 'https://activity.kpcc-tech.com/share-cover.png',
       }),
     )
   })
@@ -208,14 +215,14 @@ describe('P1 activity home', () => {
     )
     expect(onMenuShareAppMessage).toHaveBeenCalledWith(
       expect.objectContaining({
-        link: 'http://localhost/activity/home?share_v=20260604-share-card-v4',
-        imgUrl: expect.stringContaining('/assets/share/share_card_thumb_20260604_v4.jpg'),
+        link: 'http://localhost/activity/home?share_v=20260605-share-cover-v5',
+        imgUrl: 'https://activity.kpcc-tech.com/share-cover.png',
       }),
     )
     expect(onMenuShareTimeline).toHaveBeenCalledWith(
       expect.objectContaining({
-        link: 'http://localhost/activity/home?share_v=20260604-share-card-v4',
-        imgUrl: expect.stringContaining('/assets/share/share_card_thumb_20260604_v4.jpg'),
+        link: 'http://localhost/activity/home?share_v=20260605-share-cover-v5',
+        imgUrl: 'https://activity.kpcc-tech.com/share-cover.png',
       }),
     )
   })
@@ -258,7 +265,7 @@ describe('P1 activity home', () => {
     expect(panel?.textContent).toContain('signature_url')
     expect(panel?.textContent).toContain('/activity/home?wxdebug=1')
     expect(panel?.textContent).toContain('share_image')
-    expect(panel?.textContent).toContain('share_card_thumb_20260604_v4.jpg')
+    expect(panel?.textContent).toContain('https://activity.kpcc-tech.com/share-cover.png')
     expect(panel?.textContent).toContain('call_updateAppMessageShareData')
     expect(panel?.textContent).toContain('call_updateTimelineShareData')
     expect(trackEvent).toHaveBeenCalledWith(
@@ -1101,15 +1108,15 @@ describe('P1 activity home', () => {
       expect.objectContaining({
         title: expect.stringContaining('过儿签'),
         desc: expect.stringContaining('抽签即领优惠券福利'),
-        link: 'http://localhost/activity/home?share_token=SH_WX_RESULT&share_v=20260604-share-card-v4',
-        imgUrl: expect.stringContaining('/assets/share/share_card_thumb_20260604_v4.jpg'),
+        link: 'http://localhost/activity/home?share_token=SH_WX_RESULT&share_v=20260605-share-cover-v5',
+        imgUrl: 'https://activity.kpcc-tech.com/share-cover.png',
       }),
     )
     expect(updateTimelineShareData).toHaveBeenCalledWith(
       expect.objectContaining({
         title: expect.stringContaining('过儿签'),
-        link: 'http://localhost/activity/home?share_token=SH_WX_RESULT&share_v=20260604-share-card-v4',
-        imgUrl: expect.stringContaining('/assets/share/share_card_thumb_20260604_v4.jpg'),
+        link: 'http://localhost/activity/home?share_token=SH_WX_RESULT&share_v=20260605-share-cover-v5',
+        imgUrl: 'https://activity.kpcc-tech.com/share-cover.png',
       }),
     )
   })

@@ -743,8 +743,8 @@ const MINI_PROGRAM_POSTER_SAVE_MESSAGE = '正在打开小程序保存到相册..
 const RESULT_WECHAT_SHARE_DESC = '测六月考运，抽签即领优惠券福利'
 const DEFAULT_WECHAT_SHARE_TITLE = '高考抽签专属福利｜Prime Cuts 璞莱牧'
 const DEFAULT_WECHAT_TIMELINE_SHARE_TITLE = '高考抽签专属福利，抽签即领优惠券福利'
-const WECHAT_SHARE_CACHE_VERSION = '20260604-share-card-v4'
-const WECHAT_SHARE_CARD_IMAGE = shareAsset('share_card_thumb_20260604_v4.jpg')
+const WECHAT_SHARE_CACHE_VERSION = '20260605-share-cover-v5'
+const WECHAT_SHARE_CARD_IMAGE = 'https://activity.kpcc-tech.com/share-cover.png'
 const withWechatShareVersion = (value) => {
   if (!value || typeof window === 'undefined') {
     return value
